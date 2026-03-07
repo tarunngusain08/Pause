@@ -1,5 +1,6 @@
 package com.pause.app.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -10,20 +11,20 @@ import androidx.room.PrimaryKey
     foreignKeys = [
         ForeignKey(
             entity = MonitoredApp::class,
-            parentColumns = ["packageName"],
-            childColumns = ["packageName"],
-            onDelete = ForeignKey.CASCADE
+            parentColumns = ["package_name"],
+            childColumns = ["package_name"],
+            onDelete = ForeignKey.NO_ACTION
         )
     ],
     indices = [Index("package_name"), Index("launched_at")]
 )
 data class LaunchEvent(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val packageName: String,
-    val launchedAt: Long,
-    val reflectionReason: String? = null,
-    val wasCancelled: Boolean = false,
-    val wasDuringFocus: Boolean = false,
-    val wasDuringCommitment: Boolean = false,
-    val delayDurationSeconds: Int = 0
+    @ColumnInfo(name = "package_name") val packageName: String,
+    @ColumnInfo(name = "launched_at") val launchedAt: Long,
+    @ColumnInfo(name = "reflection_reason") val reflectionReason: String? = null,
+    @ColumnInfo(name = "was_cancelled") val wasCancelled: Boolean = false,
+    @ColumnInfo(name = "was_during_focus") val wasDuringFocus: Boolean = false,
+    @ColumnInfo(name = "was_during_commitment") val wasDuringCommitment: Boolean = false,
+    @ColumnInfo(name = "delay_duration_seconds") val delayDurationSeconds: Int = 0
 )
