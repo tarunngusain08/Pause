@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.pause.app.data.db.entity.UnlockEvent
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UnlockEventDao {
@@ -16,7 +17,7 @@ interface UnlockEventDao {
         """SELECT COUNT(*) FROM unlock_events 
         WHERE unlocked_at >= :midnight"""
     )
-    fun getDailyUnlockCount(midnight: Long): kotlinx.coroutines.flow.Flow<Int>
+    fun getDailyUnlockCount(midnight: Long): Flow<Int>
 
     @Query(
         """SELECT COUNT(*) FROM unlock_events 
