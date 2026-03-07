@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.pause.app.data.db.entity.MonitoredApp
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,9 @@ interface MonitoredAppDao {
 
     @Query("SELECT * FROM monitored_apps ORDER BY added_at ASC")
     fun getAllMonitoredApps(): Flow<List<MonitoredApp>>
+
+    @Query("SELECT * FROM monitored_apps ORDER BY added_at ASC")
+    suspend fun getAllMonitoredAppsSnapshot(): List<MonitoredApp>
 
     @Query("SELECT * FROM monitored_apps WHERE package_name = :packageName LIMIT 1")
     suspend fun getByPackageName(packageName: String): MonitoredApp?
@@ -38,4 +42,13 @@ interface MonitoredAppDao {
 
     @Query("DELETE FROM monitored_apps WHERE package_name = :packageName")
     suspend fun deleteByPackageName(packageName: String)
+
+    @Query("DELETE FROM monitored_apps")
+    suspend fun deleteAll()
+
+    @Transaction
+    suspend fun replaceAll(apps: List<MonitoredApp>) {
+        deleteAll()
+        if (apps.isNotEmpty()) insertAll(apps)
+    }
 }
