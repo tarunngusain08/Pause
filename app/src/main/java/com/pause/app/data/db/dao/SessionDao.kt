@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.pause.app.data.db.entity.Session
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SessionDao {
@@ -20,9 +21,12 @@ interface SessionDao {
     suspend fun getActiveSession(): Session?
 
     @Query("SELECT * FROM sessions WHERE is_active = 1 LIMIT 1")
-    fun getActiveSessionFlow(): kotlinx.coroutines.flow.Flow<Session?>
+    fun getActiveSessionFlow(): Flow<Session?>
 
-    @Query("UPDATE sessions SET is_active = 0, was_broken = 1, broken_at = :brokenAt WHERE id = :sessionId")
+    @Query("SELECT * FROM sessions WHERE session_type = 'STRICT' AND is_active = 1 LIMIT 1")
+    suspend fun getActiveStrictSession(): Session?
+
+    @Query("UPDATE sessions SET is_active = 0, was_broken = 1, broken_at = :brokenAt, settings_locked = 0 WHERE id = :sessionId")
     suspend fun markBroken(sessionId: Long, brokenAt: Long)
 
     @Query("UPDATE sessions SET is_active = 0 WHERE id = :sessionId")
