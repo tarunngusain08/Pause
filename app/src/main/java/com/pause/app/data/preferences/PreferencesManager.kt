@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,6 +28,9 @@ class PreferencesManager @Inject constructor(
     val delayDurationSeconds: Flow<Int> = dataStore.data.map { prefs ->
         prefs[KEY_DELAY_DURATION] ?: DEFAULT_DELAY_SECONDS
     }
+
+    suspend fun getDelayDurationSeconds(): Int =
+        dataStore.data.map { it[KEY_DELAY_DURATION] ?: DEFAULT_DELAY_SECONDS }.first()
 
     val onboardingComplete: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEY_ONBOARDING_COMPLETE] ?: false
@@ -72,6 +76,54 @@ class PreferencesManager @Inject constructor(
         dataStore.edit { it[KEY_DAILY_ALLOWANCE_MINUTES] = minutes }
     }
 
+    suspend fun getAnyStrictActive(): Boolean =
+        dataStore.data.map { it[KEY_ANY_STRICT_ACTIVE] ?: false }.first()
+
+    suspend fun setAnyStrictActive(active: Boolean) {
+        dataStore.edit { it[KEY_ANY_STRICT_ACTIVE] = active }
+    }
+
+    suspend fun getParentalActive(): Boolean =
+        dataStore.data.map { it[KEY_PARENTAL_ACTIVE] ?: false }.first()
+
+    suspend fun setParentalActive(active: Boolean) {
+        dataStore.edit { it[KEY_PARENTAL_ACTIVE] = active }
+    }
+
+    suspend fun getPinBcryptHash(): String? =
+        dataStore.data.map { it[KEY_PIN_BCRYPT_HASH] }.first()
+
+    suspend fun setPinBcryptHash(hash: String?) {
+        dataStore.edit {
+            if (hash != null) it[KEY_PIN_BCRYPT_HASH] = hash
+            else it.remove(KEY_PIN_BCRYPT_HASH)
+        }
+    }
+
+    suspend fun getRecoveryPhraseHash(): String? =
+        dataStore.data.map { it[KEY_RECOVERY_PHRASE_HASH] }.first()
+
+    suspend fun setRecoveryPhraseHash(hash: String?) {
+        dataStore.edit {
+            if (hash != null) it[KEY_RECOVERY_PHRASE_HASH] = hash
+            else it.remove(KEY_RECOVERY_PHRASE_HASH)
+        }
+    }
+
+    suspend fun getPinAttemptCount(): Int =
+        dataStore.data.map { it[KEY_PIN_ATTEMPT_COUNT] ?: 0 }.first()
+
+    suspend fun setPinAttemptCount(count: Int) {
+        dataStore.edit { it[KEY_PIN_ATTEMPT_COUNT] = count }
+    }
+
+    suspend fun getPinLockoutUntil(): Long =
+        dataStore.data.map { it[KEY_PIN_LOCKOUT_UNTIL] ?: 0L }.first()
+
+    suspend fun setPinLockoutUntil(epochMs: Long) {
+        dataStore.edit { it[KEY_PIN_LOCKOUT_UNTIL] = epochMs }
+    }
+
     companion object {
         private val KEY_DELAY_DURATION = intPreferencesKey("delay_duration_seconds")
         private val KEY_ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
@@ -79,6 +131,12 @@ class PreferencesManager @Inject constructor(
         private val KEY_LAST_COST_OF_SCROLL_DATE = longPreferencesKey("last_cost_of_scroll_date")
         private val KEY_SHOW_RE_ENTRY_PROMPT = booleanPreferencesKey("show_re_entry_prompt")
         private val KEY_DAILY_ALLOWANCE_MINUTES = intPreferencesKey("daily_allowance_minutes")
+        private val KEY_ANY_STRICT_ACTIVE = booleanPreferencesKey("any_strict_active")
+        private val KEY_PARENTAL_ACTIVE = booleanPreferencesKey("parental_active")
+        private val KEY_PIN_BCRYPT_HASH = stringPreferencesKey("pin_bcrypt_hash")
+        private val KEY_RECOVERY_PHRASE_HASH = stringPreferencesKey("recovery_phrase_hash")
+        private val KEY_PIN_ATTEMPT_COUNT = intPreferencesKey("pin_attempt_count")
+        private val KEY_PIN_LOCKOUT_UNTIL = longPreferencesKey("pin_lockout_until")
 
         const val DEFAULT_DELAY_SECONDS = 10
         const val DEFAULT_PHASE = 1
