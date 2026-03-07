@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Pause</string>
     <string name="accessibility_service_description">Pause uses the Accessibility Service to detect when you open monitored apps, so it can show a brief pause screen before the app opens. Pause cannot read your messages, see your passwords, or access personal content.</string>
+    <string name="strict_mode_channel_name">Strict Mode</string>
+    <string name="strict_mode_notification_title">Strict Mode active</string>
 </resources>
