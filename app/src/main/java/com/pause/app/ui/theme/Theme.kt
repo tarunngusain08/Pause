@@ -12,10 +12,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val SoftBlue = Color(0xFF4A90A4)
-private val SoftBlueDark = Color(0xFF2E5F6B)
-private val CalmBackground = Color(0xFFF0F4F8)
-private val CalmSurface = Color(0xFFE8F4F7)
 private val OnPrimary = Color.White
 private val OnSurface = Color(0xFF1A1A2E)
 private val OnSurfaceVariant = Color(0xFF5A5A6E)
