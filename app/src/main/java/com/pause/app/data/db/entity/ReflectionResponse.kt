@@ -1,5 +1,6 @@
 package com.pause.app.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -11,7 +12,7 @@ import androidx.room.PrimaryKey
         ForeignKey(
             entity = LaunchEvent::class,
             parentColumns = ["id"],
-            childColumns = ["launchEventId"],
+            childColumns = ["launch_event_id"],
             onDelete = ForeignKey.CASCADE
         )
     ],
@@ -19,9 +20,9 @@ import androidx.room.PrimaryKey
 )
 data class ReflectionResponse(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val launchEventId: Long,
-    val reasonCode: String,
-    val respondedAt: Long = System.currentTimeMillis()
+    @ColumnInfo(name = "launch_event_id") val launchEventId: Long,
+    @ColumnInfo(name = "reason_code") val reasonCode: String,
+    @ColumnInfo(name = "responded_at") val respondedAt: Long = System.currentTimeMillis()
 ) {
     companion object {
         const val REASON_BORED = "BORED"
