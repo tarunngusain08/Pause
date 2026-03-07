@@ -4,7 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Left pause bar — centered within the adaptive icon safe zone (18–90 viewport units) -->
     <path
-        android:fillColor="#4A90A4"
-        android:pathData="M54,36 L72,54 L54,72 L36,54 Z" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,30 Q33,28 35,28 L47,28 Q49,28 49,30 L49,78 Q49,80 47,80 L35,80 Q33,80 33,78 Z" />
+    <!-- Right pause bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M59,30 Q59,28 61,28 L73,28 Q75,28 75,30 L75,78 Q75,80 73,80 L61,80 Q59,80 59,78 Z" />
 </vector>
