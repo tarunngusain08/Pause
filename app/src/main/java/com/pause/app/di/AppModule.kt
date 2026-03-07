@@ -1,6 +1,7 @@
 package com.pause.app.di
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.view.WindowManager
 import dagger.Module
 import dagger.Provides
@@ -17,4 +18,9 @@ object AppModule {
     @Singleton
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+    @Provides
+    @Singleton
+    fun providePackageManager(@ApplicationContext context: Context): PackageManager =
+        context.packageManager
 }
