@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F0F4F8"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/parental_block_app_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="App is restricted"
+        android:textColor="#1A1A2E"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/parental_block_lifts_at"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Lifts at 7:00 AM"
+        android:textColor="#4A90A4"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/parental_block_emergency"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Call Emergency Contact"
+        android:visibility="gone"
+        android:textColor="#FFFFFF" />
+
+    <Button
+        android:id="@+id/parental_block_understand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="I understand"
+        android:textColor="#FFFFFF" />
+</LinearLayout>
