@@ -30,6 +30,6 @@ class AppRepository @Inject constructor(
     suspend fun removeApp(packageName: String) = monitoredAppDao.deleteByPackageName(packageName)
 
     suspend fun setMonitoredApps(apps: List<MonitoredApp>) {
-        monitoredAppDao.insertAll(apps)
+        monitoredAppDao.replaceAll(apps)
     }
 }
