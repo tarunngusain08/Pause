@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F0F4F8"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/session_complete_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Strict Mode complete."
+        android:textColor="#1A1A2E"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textAlignment="center" />
+
+    <TextView
+        android:id="@+id/session_complete_duration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="You stayed focused."
+        android:textColor="#4A90A4"
+        android:textSize="16sp"
+        android:textAlignment="center" />
+
+    <Button
+        android:id="@+id/session_complete_dismiss"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Done"
+        android:textColor="#FFFFFF" />
+</LinearLayout>
