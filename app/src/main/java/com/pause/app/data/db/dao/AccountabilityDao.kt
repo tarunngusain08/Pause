@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.pause.app.data.db.entity.Accountability
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AccountabilityDao {
@@ -14,7 +15,7 @@ interface AccountabilityDao {
     suspend fun getPartner(): Accountability?
 
     @Query("SELECT * FROM accountability LIMIT 1")
-    fun getPartnerFlow(): kotlinx.coroutines.flow.Flow<Accountability?>
+    fun getPartnerFlow(): Flow<Accountability?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(accountability: Accountability): Long
