@@ -19,12 +19,24 @@ import javax.inject.Inject
 data class StrictSetupUiState(
     val monitoredApps: List<MonitoredApp> = emptyList(),
     val selectedPackages: Set<String> = emptySet(),
-    val selectedDurationMs: Long = 60 * 60 * 1000L,
+    /** Preset duration index (-1 = custom) */
+    val selectedPresetIndex: Int = 1,
+    val customHours: Int = 0,
+    val customMinutes: Int = 30,
+    val useCustomDuration: Boolean = false,
     val showFirstConfirm: Boolean = false,
     val showSecondConfirm: Boolean = false,
     val isStarting: Boolean = false,
     val startError: String? = null
-)
+) {
+    val selectedDurationMs: Long
+        get() = if (useCustomDuration) {
+            (customHours * 60L + customMinutes) * 60_000L
+        } else {
+            StrictModeSetupViewModel.DURATION_PRESETS.getOrNull(selectedPresetIndex)?.first
+                ?: 60 * 60 * 1000L
+        }
+}
 
 @HiltViewModel
 class StrictModeSetupViewModel @Inject constructor(
@@ -62,8 +74,20 @@ class StrictModeSetupViewModel @Inject constructor(
         }
     }
 
-    fun setDuration(durationMs: Long) {
-        _uiState.update { it.copy(selectedDurationMs = durationMs) }
+    fun selectPreset(index: Int) {
+        _uiState.update { it.copy(selectedPresetIndex = index, useCustomDuration = false) }
+    }
+
+    fun selectCustomDuration() {
+        _uiState.update { it.copy(useCustomDuration = true) }
+    }
+
+    fun setCustomHours(hours: Int) {
+        _uiState.update { it.copy(customHours = hours.coerceIn(0, 8)) }
+    }
+
+    fun setCustomMinutes(minutes: Int) {
+        _uiState.update { it.copy(customMinutes = minutes.coerceIn(0, 55)) }
     }
 
     fun showFirstConfirmation() {
