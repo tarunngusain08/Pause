@@ -4,12 +4,19 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Left pause bar — centered within the adaptive icon safe zone (18–90 viewport units) -->
+    <!--
+        Two pause bars, each 15 units wide × 43 tall, with an 18-unit gap between them.
+        Total width = 48 units, centered at viewport x=54 (range 30–78).
+        Vertical range 32–75 (43 units), centered at viewport y=53.5.
+        Corner radius = 5 for a modern rounded-rectangle feel.
+        All coordinates are well within the adaptive-icon safe zone (18–90).
+    -->
+    <!-- Left bar -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M33,30 Q33,28 35,28 L47,28 Q49,28 49,30 L49,78 Q49,80 47,80 L35,80 Q33,80 33,78 Z" />
-    <!-- Right pause bar -->
+        android:pathData="M30,37 Q30,32 35,32 L40,32 Q45,32 45,37 L45,70 Q45,75 40,75 L35,75 Q30,75 30,70 Z" />
+    <!-- Right bar -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M59,30 Q59,28 61,28 L73,28 Q75,28 75,30 L75,78 Q75,80 73,80 L61,80 Q59,80 59,78 Z" />
+        android:pathData="M63,37 Q63,32 68,32 L73,32 Q78,32 78,37 L78,70 Q78,75 73,75 L68,75 Q63,75 63,70 Z" />
 </vector>
