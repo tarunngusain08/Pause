@@ -3,7 +3,6 @@ package com.pause.app.ui.home
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,13 +17,14 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +51,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.delay
 
+
 @Composable
 fun HomeScreen(
     onNavigateToAppSelection: () -> Unit,
@@ -65,6 +67,8 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var strictRemainingMs by remember { mutableStateOf(0L) }
+    // Tracks whether the user explicitly dismissed the permission dialog this session.
+    var permissionDialogDismissed by remember { mutableStateOf(false) }
 
     LaunchedEffect(strictSession) {
         if (strictSession != null) {
@@ -77,15 +81,39 @@ fun HomeScreen(
     }
 
     // Re-check permissions every time the screen becomes visible (ON_RESUME).
-    // This covers: first open, and returning from system Settings after granting.
+    // Also reset dismiss flag so returning after fixing in Settings re-evaluates.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshPermissions()
+                permissionDialogDismissed = false
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Show permission dialog if anything is still missing and user hasn't dismissed it yet.
+    if (!permissionStatus.allGranted && !permissionDialogDismissed) {
+        PermissionsDialog(
+            overlayMissing = !permissionStatus.overlayGranted,
+            accessibilityMissing = !permissionStatus.accessibilityEnabled,
+            onDismiss = { permissionDialogDismissed = true },
+            onFixOverlay = {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}")
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            },
+            onFixAccessibility = {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        )
     }
 
     Column(
@@ -100,37 +128,6 @@ fun HomeScreen(
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary
         )
-
-        // Permission banners
-        if (!permissionStatus.overlayGranted) {
-            Spacer(modifier = Modifier.height(12.dp))
-            PermissionBanner(
-                message = "Overlay permission needed — Pause can't show the pause screen without it.",
-                actionLabel = "Fix",
-                onClick = {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
-                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }
-            )
-        }
-
-        if (!permissionStatus.accessibilityEnabled) {
-            Spacer(modifier = Modifier.height(8.dp))
-            PermissionBanner(
-                message = "Accessibility service is off — Pause can't detect app launches.",
-                actionLabel = "Fix",
-                onClick = {
-                    context.startActivity(
-                        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }
-            )
-        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -277,44 +274,104 @@ fun HomeScreen(
 }
 
 @Composable
-private fun PermissionBanner(
-    message: String,
+private fun PermissionsDialog(
+    overlayMissing: Boolean,
+    accessibilityMissing: Boolean,
+    onDismiss: () -> Unit,
+    onFixOverlay: () -> Unit,
+    onFixAccessibility: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Permissions needed",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Pause needs the following permissions to work correctly:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (overlayMissing) {
+                    PermissionRow(
+                        icon = Icons.Outlined.Layers,
+                        title = "Display over other apps",
+                        description = "Required to show the pause screen when you open a monitored app.",
+                        actionLabel = "Open Settings",
+                        onAction = onFixOverlay
+                    )
+                }
+                if (accessibilityMissing) {
+                    PermissionRow(
+                        icon = Icons.Outlined.Accessibility,
+                        title = "Accessibility service",
+                        description = "Required to detect when a monitored app is launched.",
+                        actionLabel = "Open Settings",
+                        onAction = onFixAccessibility
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Later")
+            }
+        }
+    )
+}
+
+@Composable
+private fun PermissionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
     actionLabel: String,
-    onClick: () -> Unit
+    onAction: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        ),
-        shape = RoundedCornerShape(12.dp)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top
         ) {
             Icon(
-                imageVector = Icons.Filled.Warning,
+                imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp)
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(24.dp)
+                    .padding(top = 2.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = actionLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.clickable(onClick = onClick)
-            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = onAction,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text(actionLabel, style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 }
