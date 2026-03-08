@@ -13,9 +13,15 @@ object PermissionHelper {
 
     fun hasAccessibilityServiceEnabled(context: Context): Boolean {
         val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
-        val pauseServiceName = "${context.packageName}/com.pause.app.service.PauseAccessibilityService"
-        return enabledServices.any { it.id == pauseServiceName }
+        // FEEDBACK_ALL_MASK is more reliable than FEEDBACK_GENERIC on some launchers —
+        // some ROMs register the service with a different feedback type.
+        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        val ownPackage = context.packageName
+        val serviceClass = "com.pause.app.service.PauseAccessibilityService"
+        return enabledServices.any { info ->
+            val si = info.resolveInfo.serviceInfo
+            si.packageName == ownPackage && si.name == serviceClass
+        }
     }
 
     fun needsNotificationPermission(): Boolean =
