@@ -101,8 +101,26 @@ class OverlayManager @Inject constructor(
         }
     }
 
+    /**
+     * Dismiss overlays that are triggered by app interception (block/delay).
+     * Session-complete and session-resume overlays are NOT dismissed here because
+     * they are user-facing informational dialogs that the user should dismiss.
+     */
     fun dismiss() {
-        dismissOverlay()
+        val dismissable = setOf(
+            OverlayState.SHOWING_STRICT_BLOCK,
+            OverlayState.SHOWING_DELAY,
+            OverlayState.SHOWING_PARENTAL_BLOCK,
+            OverlayState.SHOWING_POWER_BLOCK,
+            OverlayState.SHOWING_EMERGENCY_CONFIRM,
+            OverlayState.SHOWING_REFLECTION,
+            OverlayState.SHOWING_COMMITMENT_BLOCK,
+            OverlayState.SHOWING_LOCK_INTERVENTION,
+            OverlayState.SHOWING_PIN_ENTRY
+        )
+        if (currentState in dismissable) {
+            dismissOverlay()
+        }
     }
 
     fun showStrictBlockOverlay(
@@ -122,6 +140,10 @@ class OverlayManager @Inject constructor(
             appName = appName,
             remainingMs = remainingMs,
             emergencyExitController = emergencyExitController,
+            onGoBack = {
+                dismissOverlay()
+                navigateHome()
+            },
             onShowConfirmation = {
                 showEmergencyConfirmOverlay(
                     onConfirm = { dismissOverlay(); onEmergencyConfirm() },
