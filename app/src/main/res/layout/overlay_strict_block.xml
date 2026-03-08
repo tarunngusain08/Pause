@@ -36,10 +36,21 @@
         android:letterSpacing="0.2" />
 
     <Button
+        android:id="@+id/strict_block_go_back"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginTop="32dp"
+        android:text="Go Back"
+        android:textColor="#1A1A2E"
+        android:backgroundTint="#D8E2E8"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp" />
+
+    <Button
         android:id="@+id/strict_block_emergency_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="16dp"
         android:text="Emergency Exit ×3"
         android:textColor="#FFFFFF" />
 </LinearLayout>
