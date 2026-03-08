@@ -66,19 +66,25 @@ class PauseAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             val strictSessionManager = appEntryPoint.getStrictSessionManager()
             val parentalControlManager = appEntryPoint.getParentalControlManager()
-            if (strictSessionManager.getActiveSession() != null &&
-                strictSessionManager.isPackageBlocked(packageName)
-            ) {
-                val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
-                val appName = app?.appName ?: packageName
-                if (currentForegroundPackage != packageName) return@launch
-                overlayManager.showStrictBlockOverlay(
-                    appName = appName,
-                    remainingMs = strictSessionManager.getRemainingMs(),
-                    onEmergencyConfirm = { strictSessionManager.confirmEmergencyExit() }
-                )
-                return@launch
+
+            // If a strict session is active but this app is NOT blocked, dismiss any
+            // lingering strict-block overlay so the user can freely use allowed apps.
+            if (strictSessionManager.getActiveSession() != null) {
+                if (strictSessionManager.isPackageBlocked(packageName)) {
+                    val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
+                    val appName = app?.appName ?: packageName
+                    if (currentForegroundPackage != packageName) return@launch
+                    overlayManager.showStrictBlockOverlay(
+                        appName = appName,
+                        remainingMs = strictSessionManager.getRemainingMs(),
+                        onEmergencyConfirm = { strictSessionManager.confirmEmergencyExit() }
+                    )
+                    return@launch
+                } else {
+                    overlayManager.dismiss()
+                }
             }
+
             if (parentalControlManager.isAppBlocked(packageName)) {
                 val blockedApp = appEntryPoint.getParentalBlockedAppRepository()
                     .getByPackageName(packageName)
@@ -106,7 +112,12 @@ class PauseAccessibilityService : AccessibilityService() {
                     appEntryPoint.getPreferencesManager().getDelayDurationSeconds()
                 if (currentForegroundPackage != packageName) return@launch
                 overlayManager.showDelayOverlay(packageName, appName, delaySeconds)
+                return@launch
             }
+
+            // User navigated to an app that is neither blocked nor monitored —
+            // dismiss any lingering overlay from a previously blocked app.
+            overlayManager.dismiss()
         }
     }
 
