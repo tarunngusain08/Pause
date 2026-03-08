@@ -16,12 +16,14 @@ class StrictBlockOverlayView(
     private val appName: String,
     private val remainingMs: Long,
     private val emergencyExitController: EmergencyExitController,
+    private val onGoBack: () -> Unit,
     private val onShowConfirmation: () -> Unit
 ) : FrameLayout(context) {
 
     private val appNameLabel: TextView
     private val remainingText: TextView
     private val dotsText: TextView
+    private val goBackButton: Button
     private val emergencyButton: Button
 
     private val handler = Handler(Looper.getMainLooper())
@@ -35,11 +37,14 @@ class StrictBlockOverlayView(
         appNameLabel = findViewById(R.id.strict_block_app_name)
         remainingText = findViewById(R.id.strict_block_remaining)
         dotsText = findViewById(R.id.strict_block_dots)
+        goBackButton = findViewById(R.id.strict_block_go_back)
         emergencyButton = findViewById(R.id.strict_block_emergency_button)
 
         setBackgroundColor(0xFFF0F4F8.toInt())
         appNameLabel.text = "$appName is blocked"
         updateRemaining(remainingMs)
+
+        goBackButton.setOnClickListener { onGoBack() }
 
         emergencyButton.setOnClickListener {
             handler.removeCallbacks(resetRunnable)
