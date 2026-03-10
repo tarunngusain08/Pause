@@ -60,7 +60,7 @@ class SessionRepository @Inject constructor(
     suspend fun startCommitmentSession(durationMinutes: Int, packageNames: List<String>): Long {
         val now = System.currentTimeMillis()
         val endsAt = now + durationMinutes * 60 * 1000L
-        val blockedJson = packageNames.joinToString(",") { "\"$it\"" }.let { "[$it]" }
+        val blockedJson = org.json.JSONArray().apply { packageNames.forEach { put(it) } }.toString()
         val session = Session(
             sessionType = Session.SessionType.COMMITMENT,
             startedAt = now,
@@ -77,9 +77,11 @@ class SessionRepository @Inject constructor(
     }
 
     private fun parseBlockedPackages(json: String): List<String> {
-        return json.removeSurrounding("[", "]")
-            .split(",")
-            .map { it.trim().removeSurrounding("\"") }
-            .filter { it.isNotEmpty() }
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }.filter { it.isNotBlank() }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }
