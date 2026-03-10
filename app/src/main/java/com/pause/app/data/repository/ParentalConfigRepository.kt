@@ -19,16 +19,24 @@ class ParentalConfigRepository @Inject constructor(
         parentalConfigDao.insert(config)
     }
 
+    private suspend fun ensureConfigExists() {
+        if (parentalConfigDao.getConfig() == null) {
+            parentalConfigDao.insert(ParentalConfig(id = 1))
+        }
+    }
+
     suspend fun updateEmergencyContact(number: String?, name: String?) {
-        if (parentalConfigDao.getConfig() == null) return
+        ensureConfigExists()
         parentalConfigDao.updateEmergencyContact(number, name, System.currentTimeMillis())
     }
 
     suspend fun setDeviceAdminEnabled(enabled: Boolean) {
+        ensureConfigExists()
         parentalConfigDao.setDeviceAdminEnabled(enabled, System.currentTimeMillis())
     }
 
     suspend fun setActive(active: Boolean) {
+        ensureConfigExists()
         parentalConfigDao.setActive(active, System.currentTimeMillis())
     }
 }
