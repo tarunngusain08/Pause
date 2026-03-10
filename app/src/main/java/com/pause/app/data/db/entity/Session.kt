@@ -2,9 +2,13 @@ package com.pause.app.data.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "sessions")
+@Entity(
+    tableName = "sessions",
+    indices = [Index(value = ["is_active"])]
+)
 data class Session(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "session_type") val sessionType: SessionType,
