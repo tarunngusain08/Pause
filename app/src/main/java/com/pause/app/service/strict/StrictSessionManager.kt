@@ -2,7 +2,9 @@ package com.pause.app.service.strict
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.json.JSONArray
 import com.pause.app.data.db.entity.Session
 import com.pause.app.data.db.entity.StrictBreakLog
 import com.pause.app.data.preferences.SessionPreferences
@@ -122,7 +124,7 @@ class StrictSessionManager @Inject constructor(
     fun onSessionExpired() {
         scope.launch {
             val durationMs = withContext(Dispatchers.IO) {
-                val session = _activeSession.value ?: return@launch
+                val session = _activeSession.value ?: return@withContext null
                 strictSessionRepository.markComplete(session.id)
                 sessionPreferences.anyStrictActive = false
                 _activeSession.value = null
@@ -133,7 +135,7 @@ class StrictSessionManager @Inject constructor(
                 context.startService(stopIntent)
 
                 session.endsAt - session.startedAt
-            }
+            } ?: return@launch
             overlayManager.showSessionCompleteOverlay(durationMs)
         }
     }
@@ -165,13 +167,15 @@ class StrictSessionManager @Inject constructor(
 
     private fun parseBlockedPackages(json: String): Set<String> {
         return try {
-            json.removePrefix("[").removeSuffix("]")
-                .split(",")
-                .map { it.trim().removeSurrounding("\"") }
-                .filter { it.isNotEmpty() }
-                .toSet()
-        } catch (_: Exception) {
+            val arr = JSONArray(json)
+            buildSet { for (i in 0 until arr.length()) add(arr.getString(i)) }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse blocked packages JSON: $json", e)
             emptySet()
         }
+    }
+
+    companion object {
+        private const val TAG = "StrictSessionManager"
     }
 }
