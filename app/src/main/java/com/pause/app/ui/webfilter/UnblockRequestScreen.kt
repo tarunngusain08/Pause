@@ -11,6 +11,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,11 @@ fun UnblockRequestScreen(
     viewModel: UnblockRequestViewModel = hiltViewModel()
 ) {
     var note by remember { mutableStateOf("") }
+
+    // Navigate back only after the insert coroutine completes
+    LaunchedEffect(Unit) {
+        viewModel.submitted.collect { onBack() }
+    }
 
     Column(
         modifier = Modifier
@@ -55,7 +61,7 @@ fun UnblockRequestScreen(
         Button(
             onClick = {
                 viewModel.submitRequest(domain, note)
-                onBack()
+                // Navigation is triggered by the `submitted` SharedFlow above, not here
             },
             modifier = Modifier.fillMaxWidth()
         ) {
