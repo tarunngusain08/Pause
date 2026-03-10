@@ -75,14 +75,15 @@ class ParentalControlManager @Inject constructor(
 
     fun handleAppLaunch(packageName: String, appName: String) {
         scope.launch {
-            val (band, blockedApp, config) = withContext(Dispatchers.IO) {
-                if (!isActiveSync()) return@launch
+            val launchCtx = withContext(Dispatchers.IO) {
+                if (!isActiveSync()) return@withContext null
                 val b = getCurrentBand()
                 val app = parentalBlockedAppRepository.getByPackageName(packageName)
-                    ?: return@launch
+                    ?: return@withContext null
                 val cfg = parentalConfigRepository.getConfigSync()
                 Triple(b, app, cfg)
-            }
+            } ?: return@launch
+            val (band, blockedApp, config) = launchCtx
             when (band) {
                 ScheduleBandEntity.ScheduleBandType.RESTRICTED -> {
                     val liftsAt = withContext(Dispatchers.IO) { formatNextBandChange() }
@@ -115,9 +116,9 @@ class ParentalControlManager @Inject constructor(
     fun handlePowerLongPress() {
         scope.launch {
             val remainingMs = withContext(Dispatchers.IO) {
-                if (!isActiveSync()) return@launch
-                scheduleEngine.getNextBandChange()?.msUntilChange ?: 0
-            }
+                if (!isActiveSync()) return@withContext null
+                scheduleEngine.getNextBandChange()?.msUntilChange ?: 0L
+            } ?: return@launch
             overlayManager.showPowerMenuBlockOverlay(remainingMs)
         }
     }
