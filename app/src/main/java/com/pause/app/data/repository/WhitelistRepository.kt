@@ -20,6 +20,9 @@ class WhitelistRepository @Inject constructor(
     suspend fun getByDomain(domain: String): WhitelistedDomain? =
         whitelistedDomainDao.getByDomain(normalizeDomain(domain))
 
+    suspend fun isWhitelisted(domain: String): Boolean =
+        getByDomain(domain) != null
+
     suspend fun addDomain(domain: WhitelistedDomain): Long =
         whitelistedDomainDao.insert(domain.copy(domain = normalizeDomain(domain.domain)))
 
