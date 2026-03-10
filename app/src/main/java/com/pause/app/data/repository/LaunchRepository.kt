@@ -15,8 +15,11 @@ class LaunchRepository @Inject constructor(
 ) {
 
     fun getTodayLaunches(packageName: String): Flow<Int> {
-        val midnight = DateUtils.getTodayMidnight()
-        return launchEventDao.getTodayLaunchCount(packageName, midnight)
+        // midnight is recomputed on each emission so the count stays correct across midnight
+        return launchEventDao.getLaunchEventsSince(0L).map { events ->
+            val midnight = DateUtils.getTodayMidnight()
+            events.count { it.packageName == packageName && it.launchedAt >= midnight && !it.wasCancelled }
+        }
     }
 
     suspend fun getTodayLaunchCount(packageName: String): Int {
