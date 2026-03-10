@@ -3,6 +3,9 @@ package com.pause.app.service.overlay
 enum class OverlayState {
     IDLE,
     SHOWING_DELAY,
+    SHOWING_LAUNCH_LIMIT,
+    SHOWING_ALLOWANCE_REACHED,
+    SHOWING_COOLDOWN,
     SHOWING_REFLECTION,
     SHOWING_COMMITMENT_BLOCK,
     SHOWING_LOCK_INTERVENTION,
