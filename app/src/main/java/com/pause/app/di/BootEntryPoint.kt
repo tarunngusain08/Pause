@@ -1,7 +1,9 @@
 package com.pause.app.di
 
+import com.pause.app.data.repository.WebFilterConfigRepository
 import com.pause.app.service.parental.ParentalControlManager
 import com.pause.app.service.strict.StrictSessionManager
+import com.pause.app.service.webfilter.PauseVpnService
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -12,4 +14,5 @@ import dagger.hilt.components.SingletonComponent
 interface BootEntryPoint {
     fun getStrictSessionManager(): StrictSessionManager
     fun getParentalControlManager(): ParentalControlManager
+    fun getWebFilterConfigRepository(): WebFilterConfigRepository
 }
