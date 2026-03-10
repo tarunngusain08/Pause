@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AccessibilityNew
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +58,7 @@ fun OnboardingScreen(
     val currentStep by viewModel.currentStep.collectAsState()
     val hasOverlay by viewModel.hasOverlay.collectAsState()
     val hasAccessibility by viewModel.hasAccessibility.collectAsState()
+    val hasUsageStats by viewModel.hasUsageStats.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -74,6 +76,10 @@ fun OnboardingScreen(
     ) { viewModel.refreshPermissions() }
 
     val accessibilityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { viewModel.refreshPermissions() }
+
+    val usageStatsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { viewModel.refreshPermissions() }
 
@@ -132,6 +138,21 @@ fun OnboardingScreen(
                 onContinue = { viewModel.advanceFromAccessibility() }
             )
 
+            OnboardingStep.USAGE_STATS -> PermissionStep(
+                icon = Icons.Outlined.QueryStats,
+                title = "Usage access",
+                description = "Pause needs usage access to track how often you open monitored apps and to enforce daily limits. Your app usage data stays on your device.",
+                granted = hasUsageStats,
+                grantedLabel = "Permission granted",
+                grantButtonLabel = "Open Settings",
+                onGrant = {
+                    usageStatsLauncher.launch(
+                        Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                    )
+                },
+                onContinue = { viewModel.advanceFromUsageStats() }
+            )
+
             OnboardingStep.NOTIFICATIONS -> PermissionStep(
                 icon = Icons.Outlined.Notifications,
                 title = "Notifications",
@@ -163,6 +184,7 @@ private fun StepIndicator(currentStep: OnboardingStep) {
         OnboardingStep.WELCOME,
         OnboardingStep.OVERLAY,
         OnboardingStep.ACCESSIBILITY,
+        OnboardingStep.USAGE_STATS,
         OnboardingStep.NOTIFICATIONS,
         OnboardingStep.DONE
     )
