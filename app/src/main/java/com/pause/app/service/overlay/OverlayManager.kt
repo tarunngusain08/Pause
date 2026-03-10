@@ -36,13 +36,23 @@ class OverlayManager @Inject constructor(
     @MainThread
     fun getState(): OverlayState = currentState
 
+    /** Returns true if a new overlay with [newState] should preempt the current one. */
+    @MainThread
+    private fun canShow(newState: OverlayState): Boolean {
+        if (newState.priority > currentState.priority) {
+            dismissOverlay()
+            return true
+        }
+        return currentState == OverlayState.IDLE
+    }
+
     @MainThread
     fun showReflectionOverlay(
         packageName: String,
         appName: String,
         onReasonSelected: (String) -> Unit
     ) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_REFLECTION)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             Log.w(TAG, "Overlay permission not granted, skipping reflection overlay")
             return
@@ -82,7 +92,7 @@ class OverlayManager @Inject constructor(
         delaySeconds: Int,
         reflectionReason: String? = null
     ) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_DELAY)) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             Log.w(TAG, "Overlay permission not granted, skipping overlay")
@@ -182,7 +192,8 @@ class OverlayManager @Inject constructor(
         remainingMs: Long,
         onEmergencyConfirm: () -> Unit
     ) {
-        if (currentState != OverlayState.IDLE && currentState != OverlayState.SHOWING_STRICT_BLOCK) return
+        if (!canShow(OverlayState.SHOWING_STRICT_BLOCK) &&
+            currentState != OverlayState.SHOWING_STRICT_BLOCK) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         dismissOverlay()
@@ -210,9 +221,9 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showPowerMenuBlockOverlay(remainingMs: Long) {
+        if (!canShow(OverlayState.SHOWING_POWER_BLOCK)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
-        dismissOverlay()
         currentState = OverlayState.SHOWING_POWER_BLOCK
         val overlay = PowerMenuBlockOverlayView(context, remainingMs) { dismissOverlay() }
         addOverlayToWindow(overlay)
@@ -220,7 +231,7 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showSessionResumeOverlay(remainingMs: Long) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_SESSION_RESUME)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_SESSION_RESUME
@@ -230,9 +241,9 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showSessionCompleteOverlay(durationMs: Long) {
+        if (!canShow(OverlayState.SHOWING_SESSION_COMPLETE)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
-        dismissOverlay()
         currentState = OverlayState.SHOWING_SESSION_COMPLETE
         val overlay = SessionCompleteOverlayView(context, durationMs) { dismissOverlay() }
         addOverlayToWindow(overlay)
@@ -240,9 +251,9 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showEmergencyConfirmOverlay(onConfirm: () -> Unit, onCancel: () -> Unit) {
+        if (!canShow(OverlayState.SHOWING_EMERGENCY_CONFIRM)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
-        dismissOverlay()
         currentState = OverlayState.SHOWING_EMERGENCY_CONFIRM
         val overlay = EmergencyConfirmOverlayView(context, onConfirm, onCancel)
         addOverlayToWindow(overlay)
@@ -256,7 +267,8 @@ class OverlayManager @Inject constructor(
         onEmergencyContact: () -> Unit = {},
         onDismiss: () -> Unit = { dismissOverlay() }
     ) {
-        if (currentState != OverlayState.IDLE && currentState != OverlayState.SHOWING_PARENTAL_BLOCK) return
+        if (!canShow(OverlayState.SHOWING_PARENTAL_BLOCK) &&
+            currentState != OverlayState.SHOWING_PARENTAL_BLOCK) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         dismissOverlay()
@@ -273,16 +285,36 @@ class OverlayManager @Inject constructor(
     }
 
     @MainThread
-    fun showPINEntryOverlay(onSuccess: (String) -> Unit, onForgotPIN: () -> Unit) {
+    fun showPINEntryOverlay(
+        onSuccess: (String) -> Unit,
+        onForgotPIN: () -> Unit,
+        onPinAttempt: ((String, (String?) -> Unit) -> Unit)? = null
+    ) {
+        if (!canShow(OverlayState.SHOWING_PIN_ENTRY)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
-
-        dismissOverlay()
         currentState = OverlayState.SHOWING_PIN_ENTRY
+        var pinOverlayRef: PINEntryOverlayView? = null
         val overlay = PINEntryOverlayView(
             context = context,
-            onSuccess = { pin -> dismissOverlay(); onSuccess(pin) },
+            onSuccess = { pin ->
+                if (onPinAttempt != null) {
+                    // Let caller verify the PIN; callback receives an error message or null on success
+                    onPinAttempt(pin) { errorMsg ->
+                        if (errorMsg == null) {
+                            dismissOverlay()
+                            onSuccess(pin)
+                        } else {
+                            pinOverlayRef?.showError(errorMsg)
+                        }
+                    }
+                } else {
+                    dismissOverlay()
+                    onSuccess(pin)
+                }
+            },
             onForgotPIN = { dismissOverlay(); onForgotPIN() }
         )
+        pinOverlayRef = overlay
         addOverlayToWindow(overlay)
     }
 
@@ -291,7 +323,7 @@ class OverlayManager @Inject constructor(
         onOpenAnyway: () -> Unit,
         onImDone: () -> Unit
     ) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_ALLOWANCE_REACHED)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_ALLOWANCE_REACHED
@@ -312,7 +344,7 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showCommitmentBlockOverlay(onBreakCommitment: () -> Unit) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_COMMITMENT_BLOCK)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_COMMITMENT_BLOCK
@@ -329,7 +361,7 @@ class OverlayManager @Inject constructor(
         onCancel: () -> Unit,
         onComplete: () -> Unit
     ) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_COOLDOWN)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_COOLDOWN
@@ -350,7 +382,7 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showLockInterventionOverlay(unlockCount: Int) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_LOCK_INTERVENTION)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_LOCK_INTERVENTION
@@ -373,7 +405,7 @@ class OverlayManager @Inject constructor(
         onOpenAnyway: () -> Unit,
         onSkip: () -> Unit
     ) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_LAUNCH_LIMIT)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_LAUNCH_LIMIT
@@ -397,7 +429,7 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showScheduleResumeOverlay(currentBand: String, nextChange: String) {
-        if (currentState != OverlayState.IDLE) return
+        if (!canShow(OverlayState.SHOWING_SCHEDULE_RESUME)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
 
         currentState = OverlayState.SHOWING_SCHEDULE_RESUME
@@ -440,7 +472,9 @@ class OverlayManager @Inject constructor(
         currentOverlay?.let { overlay ->
             try {
                 windowManager.removeView(overlay)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to remove overlay view", e)
+            }
             currentOverlay = null
         }
         currentState = OverlayState.IDLE
