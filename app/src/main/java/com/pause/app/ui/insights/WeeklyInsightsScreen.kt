@@ -1,5 +1,6 @@
 package com.pause.app.ui.insights
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,7 +26,7 @@ fun WeeklyInsightsScreen(
     onBack: () -> Unit,
     viewModel: WeeklyInsightsViewModel = hiltViewModel()
 ) {
-    val insights by viewModel.insights.collectAsState()
+    val insights by viewModel.insights.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
