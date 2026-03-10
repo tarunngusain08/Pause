@@ -2,9 +2,13 @@ package com.pause.app.data.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "keyword_entries")
+@Entity(
+    tableName = "keyword_entries",
+    indices = [Index(value = ["keyword", "category"], unique = true)]
+)
 data class KeywordEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "keyword") val keyword: String, // lowercase, normalized
