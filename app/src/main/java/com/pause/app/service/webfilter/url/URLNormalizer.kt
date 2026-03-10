@@ -22,10 +22,11 @@ object URLNormalizer {
 
     fun extractDomain(url: String): String? {
         return try {
-            val withProtocol = if (url.startsWith("http://") || url.startsWith("https://")) {
-                url
-            } else {
-                "https://$url"
+            val withProtocol = when {
+                url.startsWith("http://") || url.startsWith("https://") -> url
+                // Only prepend https:// for plain hostnames/paths, not other schemes
+                !url.contains("://") -> "https://$url"
+                else -> return null
             }
             val uri = URI(withProtocol)
             val host = uri.host ?: return null
@@ -56,5 +57,5 @@ object URLNormalizer {
     }
 
     fun isValidURL(url: String): Boolean =
-        URL_REGEX.matches(url) || url.contains(".")
+        URL_REGEX.matches(url)
 }
