@@ -22,10 +22,14 @@ class SettingsViewModel @Inject constructor(
     private val _dailyAllowanceMinutes = MutableStateFlow(PreferencesManager.DEFAULT_ALLOWANCE_MINUTES)
     val dailyAllowanceMinutes: StateFlow<Int> = _dailyAllowanceMinutes.asStateFlow()
 
+    private val _currentPhase = MutableStateFlow(PreferencesManager.DEFAULT_PHASE)
+    val currentPhase: StateFlow<Int> = _currentPhase.asStateFlow()
+
     init {
         viewModelScope.launch {
             _delaySeconds.value = preferencesManager.getDelayDurationSeconds()
             _dailyAllowanceMinutes.value = preferencesManager.dailyAllowanceMinutes.first()
+            _currentPhase.value = preferencesManager.currentPhase.first()
         }
     }
 
@@ -40,6 +44,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesManager.setDailyAllowanceMinutes(minutes)
             _dailyAllowanceMinutes.value = minutes
+        }
+    }
+
+    fun setCurrentPhase(phase: Int) {
+        viewModelScope.launch {
+            preferencesManager.setCurrentPhase(phase)
+            _currentPhase.value = phase
         }
     }
 }
