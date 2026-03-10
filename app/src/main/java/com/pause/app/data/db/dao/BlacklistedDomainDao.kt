@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.pause.app.data.db.entity.BlacklistedDomain
 import kotlinx.coroutines.flow.Flow
@@ -35,4 +36,13 @@ interface BlacklistedDomainDao {
 
     @Query("SELECT * FROM blacklisted_domains WHERE pending_parent_review = 1 ORDER BY added_at ASC")
     suspend fun getPendingReview(): List<BlacklistedDomain>
+
+    @Query("SELECT COUNT(*) FROM blacklisted_domains WHERE source = 'CATEGORY' AND is_active = 1")
+    suspend fun getCategoryDomainCount(): Int
+
+    @Transaction
+    suspend fun insertCategoryDomainsIfNone(domains: List<BlacklistedDomain>) {
+        if (getCategoryDomainCount() > 0) return
+        domains.forEach { insert(it) }
+    }
 }
