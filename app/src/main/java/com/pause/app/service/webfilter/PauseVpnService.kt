@@ -20,6 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -46,6 +47,7 @@ class PauseVpnService : VpnService() {
             .addRoute("0.0.0.0", 0)
             .addDnsServer("10.0.0.1")
             .setMtu(1500)
+            .addDisallowedApplication(packageName)
         vpnInterface = config.establish()
         if (vpnInterface != null) {
             startForeground(NOTIFICATION_ID, createNotification())
@@ -67,32 +69,54 @@ class PauseVpnService : VpnService() {
         val whitelistMatcher = entryPoint.getWhitelistMatcher()
         val configRepo = entryPoint.getWebFilterConfigRepository()
 
-        val config = configRepo.getConfig()
+        var config = configRepo.getConfig()
         if (config == null || !config.vpnEnabled) {
             stopVpn()
             return
         }
 
         val buffer = ByteArray(2048)
+        var loopCount = 0
         try {
             FileInputStream(vpnFd.fileDescriptor).use { input ->
-                while (vpnInterface != null) {
-                    try {
-                        val read = input.read(buffer)
-                        if (read <= 0) continue
-                        val packet = buffer.copyOf(read)
-                        val query = DNSPacketParser.parseQuery(packet) ?: continue
-                        val domain = query.question
-                        val upstream = config.upstreamDns.ifBlank { "8.8.8.8" }
-                        when {
-                            whitelistMatcher.isWhitelisted(domain) ->
-                                resolveUpstream(upstream, packet)
-                            blocklistMatcher.isBlocked(domain) ->
-                                DNSPacketParser.buildNXDomainResponse(query)
-                            else ->
-                                resolveUpstream(upstream, packet)
-                        }
-                    } catch (_: Exception) { }
+                FileOutputStream(vpnFd.fileDescriptor).use { output ->
+                    while (vpnInterface != null) {
+                        try {
+                            val cfg = if (++loopCount % 100 == 0) {
+                                val newConfig = configRepo.getConfig()
+                                if (newConfig == null || !newConfig.vpnEnabled) {
+                                    stopVpn()
+                                    return
+                                }
+                                config = newConfig
+                                newConfig
+                            } else {
+                                config
+                            } ?: return
+                            val read = input.read(buffer)
+                            if (read <= 0) continue
+                            val packet = buffer.copyOf(read)
+                            val ipUdpInfo = DNSPacketParser.extractDnsInfo(packet) ?: continue
+                            val dnsPayload = packet.copyOfRange(
+                                ipUdpInfo.dnsOffset,
+                                ipUdpInfo.dnsOffset + ipUdpInfo.dnsLength
+                            )
+                            val query = DNSPacketParser.parseQuery(dnsPayload) ?: continue
+                            val domain = query.question
+                            val upstream = cfg.upstreamDns.ifBlank { "8.8.8.8" }
+                            val dnsResponse: ByteArray = when {
+                                whitelistMatcher.isWhitelisted(domain) ->
+                                    resolveUpstream(upstream, dnsPayload) ?: continue
+                                blocklistMatcher.isBlocked(domain) ->
+                                    DNSPacketParser.buildNXDomainResponse(query)
+                                else ->
+                                    resolveUpstream(upstream, dnsPayload) ?: continue
+                            }
+                            if (dnsResponse.isNotEmpty()) {
+                                output.write(DNSPacketParser.wrapResponse(dnsResponse, ipUdpInfo))
+                            }
+                        } catch (_: Exception) { }
+                    }
                 }
             }
         } catch (_: Exception) { }
