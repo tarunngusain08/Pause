@@ -1,5 +1,6 @@
 package com.pause.app.ui.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,9 +27,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val delaySeconds by viewModel.delaySeconds.collectAsState()
-    val dailyAllowanceMinutes by viewModel.dailyAllowanceMinutes.collectAsState()
-    val currentPhase by viewModel.currentPhase.collectAsState()
+    val delaySeconds by viewModel.delaySeconds.collectAsStateWithLifecycle()
+    val dailyAllowanceMinutes by viewModel.dailyAllowanceMinutes.collectAsStateWithLifecycle()
+    val currentPhase by viewModel.currentPhase.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -114,38 +115,40 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (com.pause.app.BuildConfig.DEBUG) {
+            Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = "Features",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Phase 1: delay only. Phase 2: + reflection, allowance, launch limits. Phase 3: + commitment, lock intervention.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Debug: Feature Phase",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Phase 1: delay only. Phase 2: + reflection, allowance, launch limits. Phase 3: + commitment, lock intervention.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-        listOf(1, 2, 3).forEach { phase ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = currentPhase == phase,
-                    onClick = { viewModel.setCurrentPhase(phase) }
-                )
-                Spacer(modifier = Modifier.padding(start = 8.dp))
-                Text(
-                    text = "Phase $phase",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            listOf(1, 2, 3).forEach { phase ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = currentPhase == phase,
+                        onClick = { viewModel.setCurrentPhase(phase) }
+                    )
+                    Spacer(modifier = Modifier.padding(start = 8.dp))
+                    Text(
+                        text = "Phase $phase",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
 
