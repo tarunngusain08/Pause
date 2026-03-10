@@ -17,6 +17,9 @@ class AppRepository @Inject constructor(
     fun getAllMonitoredApps(): Flow<List<MonitoredApp>> =
         monitoredAppDao.getAllMonitoredApps()
 
+    suspend fun getActiveMonitoredAppsSnapshot(): List<MonitoredApp> =
+        monitoredAppDao.getAllMonitoredAppsSnapshot().filter { it.isActive }
+
     suspend fun getByPackageName(packageName: String): MonitoredApp? =
         monitoredAppDao.getByPackageName(packageName)
 
