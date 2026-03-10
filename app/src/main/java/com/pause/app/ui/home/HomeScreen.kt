@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.AlertDialog
@@ -57,10 +58,16 @@ fun HomeScreen(
     onNavigateToAppSelection: () -> Unit,
     onNavigateToStrictSetup: () -> Unit = {},
     onNavigateToParentalSetup: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToFocus: () -> Unit = {},
+    onNavigateToInsights: () -> Unit = {},
+    onNavigateToCommitment: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val monitoredApps by viewModel.monitoredApps.collectAsState(initial = emptyList())
     val todayLaunches by viewModel.todayLaunches.collectAsState(initial = emptyMap())
+    val streak by viewModel.streak.collectAsState(initial = null)
+    val costOfScrollMinutes by viewModel.costOfScrollMinutes.collectAsState(initial = null)
     val strictSession by viewModel.strictSession.collectAsState(initial = null)
     val permissionStatus by viewModel.permissionStatus.collectAsState()
     val context = LocalContext.current
@@ -158,6 +165,67 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Cost of a Scroll card (Phase 2+)
+        costOfScrollMinutes?.let { minutes ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Cost of a Scroll",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Yesterday you opened monitored apps ~$minutes min worth of times.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    TextButton(onClick = { viewModel.dismissCostOfScrollCard() }) {
+                        Text("Dismiss")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Streak card (Phase 2+)
+        streak?.let { s ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Streak",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${s.currentStreakDays} days",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // Monitored apps section
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -204,6 +272,12 @@ fun HomeScreen(
         } else {
             monitoredApps.forEach { app ->
                 val count = todayLaunches[app.packageName] ?: 0
+                val limit = app.dailyLaunchLimit
+                val countText = if (limit != null) {
+                    "$count / $limit opens today"
+                } else {
+                    "$count opens today"
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -218,7 +292,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = "$count opens today",
+                        text = countText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -259,6 +333,39 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedButton(
+            onClick = onNavigateToFocus,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Focus Mode")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onNavigateToInsights,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Weekly Insights")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onNavigateToCommitment,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Commitment Mode")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
             onClick = onNavigateToParentalSetup,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -269,6 +376,21 @@ fun HomeScreen(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text("Parental Control")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onNavigateToSettings,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Settings")
         }
     }
 }
