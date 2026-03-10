@@ -75,15 +75,28 @@ class ParentalControlManager @Inject constructor(
 
     fun handleAppLaunch(packageName: String, appName: String) {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                if (!isActiveSync()) return@withContext
-                val band = getCurrentBand()
-                val blockedApp = parentalBlockedAppRepository.getByPackageName(packageName)
-                if (blockedApp == null) return@withContext
-                val config = parentalConfigRepository.getConfigSync()
-                when (band) {
-                    ScheduleBandEntity.ScheduleBandType.RESTRICTED -> {
-                        val liftsAt = formatNextBandChange()
+            val (band, blockedApp, config) = withContext(Dispatchers.IO) {
+                if (!isActiveSync()) return@launch
+                val b = getCurrentBand()
+                val app = parentalBlockedAppRepository.getByPackageName(packageName)
+                    ?: return@launch
+                val cfg = parentalConfigRepository.getConfigSync()
+                Triple(b, app, cfg)
+            }
+            when (band) {
+                ScheduleBandEntity.ScheduleBandType.RESTRICTED -> {
+                    val liftsAt = withContext(Dispatchers.IO) { formatNextBandChange() }
+                    overlayManager.showParentalBlockOverlay(
+                        appName = appName,
+                        liftsAt = liftsAt,
+                        emergencyContact = config?.emergencyContactName,
+                        onEmergencyContact = { launchEmergencyContact() },
+                        onDismiss = { overlayManager.dismiss() }
+                    )
+                }
+                ScheduleBandEntity.ScheduleBandType.LIMITED -> {
+                    if (blockedApp.blockType == ParentalBlockedApp.BlockType.ALWAYS) {
+                        val liftsAt = withContext(Dispatchers.IO) { formatNextBandChange() }
                         overlayManager.showParentalBlockOverlay(
                             appName = appName,
                             liftsAt = liftsAt,
@@ -92,33 +105,20 @@ class ParentalControlManager @Inject constructor(
                             onDismiss = { overlayManager.dismiss() }
                         )
                     }
-                    ScheduleBandEntity.ScheduleBandType.LIMITED -> {
-                        if (blockedApp.blockType == ParentalBlockedApp.BlockType.ALWAYS) {
-                            val liftsAt = formatNextBandChange()
-                            overlayManager.showParentalBlockOverlay(
-                                appName = appName,
-                                liftsAt = liftsAt,
-                                emergencyContact = config?.emergencyContactName,
-                                onEmergencyContact = { launchEmergencyContact() },
-                                onDismiss = { overlayManager.dismiss() }
-                            )
-                        }
-                        // else: apply standard friction - handled by AccessibilityService
-                    }
-                    ScheduleBandEntity.ScheduleBandType.FREE -> { }
+                    // else: apply standard friction - handled by AccessibilityService
                 }
+                ScheduleBandEntity.ScheduleBandType.FREE -> { }
             }
         }
     }
 
     fun handlePowerLongPress() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                if (!isActiveSync()) return@withContext
-                val nextChange = scheduleEngine.getNextBandChange()
-                val remainingMs = nextChange?.msUntilChange ?: 0
-                overlayManager.showPowerMenuBlockOverlay(remainingMs)
+            val remainingMs = withContext(Dispatchers.IO) {
+                if (!isActiveSync()) return@launch
+                scheduleEngine.getNextBandChange()?.msUntilChange ?: 0
             }
+            overlayManager.showPowerMenuBlockOverlay(remainingMs)
         }
     }
 
