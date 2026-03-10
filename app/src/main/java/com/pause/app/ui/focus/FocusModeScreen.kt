@@ -1,5 +1,6 @@
 package com.pause.app.ui.focus
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,9 +27,9 @@ fun FocusModeScreen(
     onBack: () -> Unit,
     viewModel: FocusModeViewModel = hiltViewModel()
 ) {
-    val selectedIndex by viewModel.selectedDurationIndex.collectAsState()
-    val isStarting by viewModel.isStarting.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val selectedIndex by viewModel.selectedDurationIndex.collectAsStateWithLifecycle()
+    val isStarting by viewModel.isStarting.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
