@@ -16,6 +16,10 @@ import androidx.navigation.compose.rememberNavController
 import com.pause.app.ui.appselection.AppSelectionScreen
 import com.pause.app.ui.home.HomeScreen
 import com.pause.app.ui.onboarding.OnboardingScreen
+import com.pause.app.ui.commitment.CommitmentModeScreen
+import com.pause.app.ui.focus.FocusModeScreen
+import com.pause.app.ui.insights.WeeklyInsightsScreen
+import com.pause.app.ui.settings.SettingsScreen
 import com.pause.app.ui.onboarding.OnboardingViewModel
 import com.pause.app.ui.strict.StrictModeSetupScreen
 import com.pause.app.ui.parental.ParentalSetupScreen
@@ -59,8 +63,38 @@ fun PauseNavGraph() {
             HomeScreen(
                 onNavigateToAppSelection = { navController.navigate("app_selection") },
                 onNavigateToStrictSetup = { navController.navigate("strict_setup") },
-                onNavigateToParentalSetup = { navController.navigate("parental_setup") }
+                onNavigateToParentalSetup = { navController.navigate("parental_setup") },
+                onNavigateToSettings = { navController.navigate("settings") },
+                onNavigateToFocus = { navController.navigate("focus") },
+                onNavigateToInsights = { navController.navigate("weekly_insights") },
+                onNavigateToCommitment = { navController.navigate("commitment_setup") }
             )
+        }
+        composable("commitment_setup") {
+            CommitmentModeScreen(
+                onSessionStarted = {
+                    navController.navigate("home") {
+                        popUpTo("commitment_setup") { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("weekly_insights") {
+            WeeklyInsightsScreen(onBack = { navController.popBackStack() })
+        }
+        composable("focus") {
+            FocusModeScreen(
+                onSessionStarted = {
+                    navController.navigate("home") {
+                        popUpTo("focus") { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
         composable("strict_setup") {
             StrictModeSetupScreen(
