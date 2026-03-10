@@ -61,6 +61,11 @@ class StrictBlockOverlayView(
         }
     }
 
+    override fun onDetachedFromWindow() {
+        handler.removeCallbacks(resetRunnable)
+        super.onDetachedFromWindow()
+    }
+
     fun updateRemaining(ms: Long) {
         val totalSeconds = (ms / 1000).toInt()
         val minutes = totalSeconds / 60
