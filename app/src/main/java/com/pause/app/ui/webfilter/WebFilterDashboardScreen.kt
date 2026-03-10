@@ -1,5 +1,6 @@
 package com.pause.app.ui.webfilter
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.net.VpnService
 import androidx.compose.runtime.DisposableEffect
@@ -39,7 +40,7 @@ fun WebFilterDashboardScreen(
     onBack: () -> Unit,
     viewModel: WebFilterDashboardViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -91,11 +92,15 @@ fun WebFilterDashboardScreen(
                     checked = uiState.vpnEnabled,
                     onCheckedChange = { enabled ->
                         if (enabled) {
-                            viewModel.setVpnEnabled(true)
                             val intent = VpnService.prepare(context)
                             if (intent != null) {
+                                // VPN permission not yet granted; send user to system dialog.
+                                // Do NOT call setVpnEnabled(true) yet - only do so after the
+                                // VPN service actually starts (handled via ON_RESUME refresh).
                                 context.startActivity(intent)
                             } else {
+                                // Permission already granted; start the service and persist.
+                                viewModel.setVpnEnabled(true)
                                 val svcIntent = Intent(context, PauseVpnService::class.java)
                                     .setAction(PauseVpnService.ACTION_START)
                                 context.startForegroundService(svcIntent)
