@@ -9,6 +9,7 @@ import com.pause.app.data.repository.AppRepository
 import com.pause.app.data.repository.InsightsRepository
 import com.pause.app.data.repository.LaunchRepository
 import com.pause.app.data.preferences.PreferencesManager
+import com.pause.app.data.repository.SessionRepository
 import com.pause.app.data.repository.StreakRepository
 import com.pause.app.service.AllowanceTracker
 import com.pause.app.service.parental.ParentalControlManager
@@ -39,6 +40,7 @@ class HomeViewModel @Inject constructor(
     private val launchRepository: LaunchRepository,
     private val streakRepository: StreakRepository,
     private val strictSessionManager: StrictSessionManager,
+    private val sessionRepository: SessionRepository,
     private val preferencesManager: PreferencesManager,
     private val allowanceTracker: AllowanceTracker,
     private val insightsRepository: InsightsRepository,
@@ -55,6 +57,14 @@ class HomeViewModel @Inject constructor(
 
     val strictSession: StateFlow<Session?> =
         strictSessionManager.activeSession
+
+    val focusSession: StateFlow<Session?> =
+        sessionRepository.getActiveFocusSessionFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val commitmentSession: StateFlow<Session?> =
+        sessionRepository.getActiveCommitmentSessionFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val streak = streakRepository.getStreakFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
