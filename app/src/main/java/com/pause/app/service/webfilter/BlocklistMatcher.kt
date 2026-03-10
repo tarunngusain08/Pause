@@ -16,7 +16,11 @@ class BlocklistMatcher @Inject constructor(
         reloadIfNeeded()
         val normalized = normalize(domain)
         if (domains.contains(normalized)) return true
-        return domains.any { it.startsWith("*.") && domain.endsWith(it.removePrefix("*.")) }
+        return domains.any {
+            if (!it.startsWith("*.")) return@any false
+            val suffix = it.removePrefix("*.").lowercase()
+            normalized == suffix || normalized.endsWith(".$suffix")
+        }
     }
 
     suspend fun reloadFromDB() {
