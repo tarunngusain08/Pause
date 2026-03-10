@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "blacklisted_domains",
-    indices = [Index(value = ["domain"])]
+    indices = [Index(value = ["domain"], unique = true)]
 )
 data class BlacklistedDomain(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
