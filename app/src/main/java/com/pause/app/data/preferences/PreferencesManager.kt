@@ -76,19 +76,8 @@ class PreferencesManager @Inject constructor(
         dataStore.edit { it[KEY_DAILY_ALLOWANCE_MINUTES] = minutes }
     }
 
-    suspend fun getAnyStrictActive(): Boolean =
-        dataStore.data.map { it[KEY_ANY_STRICT_ACTIVE] ?: false }.first()
-
-    suspend fun setAnyStrictActive(active: Boolean) {
-        dataStore.edit { it[KEY_ANY_STRICT_ACTIVE] = active }
-    }
-
-    suspend fun getParentalActive(): Boolean =
-        dataStore.data.map { it[KEY_PARENTAL_ACTIVE] ?: false }.first()
-
-    suspend fun setParentalActive(active: Boolean) {
-        dataStore.edit { it[KEY_PARENTAL_ACTIVE] = active }
-    }
+    // anyStrictActive and parentalActive are managed by SessionPreferences (device-protected
+    // SharedPreferences). Do not add duplicate keys here to avoid two sources of truth.
 
     suspend fun getPinBcryptHash(): String? =
         dataStore.data.map { it[KEY_PIN_BCRYPT_HASH] }.first()
@@ -131,8 +120,6 @@ class PreferencesManager @Inject constructor(
         private val KEY_LAST_COST_OF_SCROLL_DATE = longPreferencesKey("last_cost_of_scroll_date")
         private val KEY_SHOW_RE_ENTRY_PROMPT = booleanPreferencesKey("show_re_entry_prompt")
         private val KEY_DAILY_ALLOWANCE_MINUTES = intPreferencesKey("daily_allowance_minutes")
-        private val KEY_ANY_STRICT_ACTIVE = booleanPreferencesKey("any_strict_active")
-        private val KEY_PARENTAL_ACTIVE = booleanPreferencesKey("parental_active")
         private val KEY_PIN_BCRYPT_HASH = stringPreferencesKey("pin_bcrypt_hash")
         private val KEY_RECOVERY_PHRASE_HASH = stringPreferencesKey("recovery_phrase_hash")
         private val KEY_PIN_ATTEMPT_COUNT = intPreferencesKey("pin_attempt_count")
