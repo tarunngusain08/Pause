@@ -29,8 +29,14 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE session_type = 'FOCUS' AND is_active = 1 LIMIT 1")
     suspend fun getActiveFocusSession(): Session?
 
+    @Query("SELECT * FROM sessions WHERE session_type = 'FOCUS' AND is_active = 1 LIMIT 1")
+    fun getActiveFocusSessionFlow(): Flow<Session?>
+
     @Query("SELECT * FROM sessions WHERE session_type = 'COMMITMENT' AND is_active = 1 LIMIT 1")
     suspend fun getActiveCommitmentSession(): Session?
+
+    @Query("SELECT * FROM sessions WHERE session_type = 'COMMITMENT' AND is_active = 1 LIMIT 1")
+    fun getActiveCommitmentSessionFlow(): Flow<Session?>
 
     @Query("UPDATE sessions SET is_active = 0, was_broken = 1, broken_at = :brokenAt, settings_locked = 0 WHERE id = :sessionId")
     suspend fun markBroken(sessionId: Long, brokenAt: Long)
