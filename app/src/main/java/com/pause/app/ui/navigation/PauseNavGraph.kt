@@ -1,5 +1,6 @@
 package com.pause.app.ui.navigation
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +39,8 @@ import com.pause.app.ui.webfilter.WhitelistScreen
 @Composable
 fun PauseNavGraph() {
     val onboardingViewModel: OnboardingViewModel = hiltViewModel()
-    val isReady by onboardingViewModel.isReady.collectAsState()
-    val onboardingComplete by onboardingViewModel.onboardingComplete.collectAsState()
+    val isReady by onboardingViewModel.isReady.collectAsStateWithLifecycle()
+    val onboardingComplete by onboardingViewModel.onboardingComplete.collectAsStateWithLifecycle()
 
     if (!isReady) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -52,117 +53,117 @@ fun PauseNavGraph() {
         return
     }
 
-    val startDestination = if (onboardingComplete) "home" else "onboarding"
+    val startDestination = if (onboardingComplete) Routes.HOME else Routes.ONBOARDING
     val navController = rememberNavController()
 
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
-        composable("onboarding") {
+        composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onComplete = {
-                    navController.navigate("home") {
-                        popUpTo("onboarding") { inclusive = true }
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 }
             )
         }
-        composable("home") {
+        composable(Routes.HOME) {
             HomeScreen(
-                onNavigateToAppSelection = { navController.navigate("app_selection") },
-                onNavigateToStrictSetup = { navController.navigate("strict_setup") },
-                onNavigateToParentalSetup = { navController.navigate("parental_setup") },
-                onNavigateToSettings = { navController.navigate("settings") },
-                onNavigateToFocus = { navController.navigate("focus") },
-                onNavigateToInsights = { navController.navigate("weekly_insights") },
-                onNavigateToCommitment = { navController.navigate("commitment_setup") },
-                onNavigateToChildStatus = { navController.navigate("child_status") }
+                onNavigateToAppSelection = { navController.navigate(Routes.APP_SELECTION) },
+                onNavigateToStrictSetup = { navController.navigate(Routes.STRICT_SETUP) },
+                onNavigateToParentalSetup = { navController.navigate(Routes.PARENTAL_SETUP) },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToFocus = { navController.navigate(Routes.FOCUS) },
+                onNavigateToInsights = { navController.navigate(Routes.WEEKLY_INSIGHTS) },
+                onNavigateToCommitment = { navController.navigate(Routes.COMMITMENT_SETUP) },
+                onNavigateToChildStatus = { navController.navigate(Routes.CHILD_STATUS) }
             )
         }
-        composable("commitment_setup") {
+        composable(Routes.COMMITMENT_SETUP) {
             CommitmentModeScreen(
                 onSessionStarted = {
-                    navController.navigate("home") {
-                        popUpTo("commitment_setup") { inclusive = true }
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.COMMITMENT_SETUP) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() }
             )
         }
-        composable("weekly_insights") {
+        composable(Routes.WEEKLY_INSIGHTS) {
             WeeklyInsightsScreen(onBack = { navController.popBackStack() })
         }
-        composable("focus") {
+        composable(Routes.FOCUS) {
             FocusModeScreen(
                 onSessionStarted = {
-                    navController.navigate("home") {
-                        popUpTo("focus") { inclusive = true }
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.FOCUS) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() }
             )
         }
-        composable("settings") {
+        composable(Routes.SETTINGS) {
             SettingsScreen(onBack = { navController.popBackStack() })
         }
-        composable("strict_setup") {
+        composable(Routes.STRICT_SETUP) {
             StrictModeSetupScreen(
                 onSessionStarted = {
-                    navController.navigate("home") {
-                        popUpTo("strict_setup") { inclusive = true }
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.STRICT_SETUP) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() }
             )
         }
-        composable("app_selection") {
+        composable(Routes.APP_SELECTION) {
             AppSelectionScreen(
                 onDone = { navController.popBackStack() }
             )
         }
-        composable("parental_setup") {
+        composable(Routes.PARENTAL_SETUP) {
             ParentalSetupScreen(
                 onComplete = {
-                    navController.navigate("parent_dashboard") {
-                        popUpTo("parental_setup") { inclusive = true }
+                    navController.navigate(Routes.PARENT_DASHBOARD) {
+                        popUpTo(Routes.PARENTAL_SETUP) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() }
             )
         }
-        composable("parent_dashboard") {
+        composable(Routes.PARENT_DASHBOARD) {
             ParentDashboardScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToWebFilter = { navController.navigate("web_filter_dashboard") }
+                onNavigateToWebFilter = { navController.navigate(Routes.WEB_FILTER_DASHBOARD) }
             )
         }
-        composable("child_status") {
+        composable(Routes.CHILD_STATUS) {
             ChildStatusScreen(onBack = { navController.popBackStack() })
         }
-        composable("web_filter_dashboard") {
+        composable(Routes.WEB_FILTER_DASHBOARD) {
             WebFilterDashboardScreen(
-                onNavigateToBlacklist = { navController.navigate("domain_blacklist") },
-                onNavigateToKeywords = { navController.navigate("keyword_manager") },
-                onNavigateToUrlLog = { navController.navigate("url_visit_log") },
-                onNavigateToWhitelist = { navController.navigate("whitelist") },
+                onNavigateToBlacklist = { navController.navigate(Routes.DOMAIN_BLACKLIST) },
+                onNavigateToKeywords = { navController.navigate(Routes.KEYWORD_MANAGER) },
+                onNavigateToUrlLog = { navController.navigate(Routes.URL_VISIT_LOG) },
+                onNavigateToWhitelist = { navController.navigate(Routes.WHITELIST) },
                 onBack = { navController.popBackStack() }
             )
         }
-        composable("domain_blacklist") {
+        composable(Routes.DOMAIN_BLACKLIST) {
             DomainBlacklistScreen(onBack = { navController.popBackStack() })
         }
-        composable("keyword_manager") {
+        composable(Routes.KEYWORD_MANAGER) {
             KeywordManagerScreen(onBack = { navController.popBackStack() })
         }
-        composable("url_visit_log") {
+        composable(Routes.URL_VISIT_LOG) {
             UrlVisitLogScreen(onBack = { navController.popBackStack() })
         }
-        composable("whitelist") {
+        composable(Routes.WHITELIST) {
             WhitelistScreen(onBack = { navController.popBackStack() })
         }
         composable(
-            route = "unblock_request/{domain}",
+            route = Routes.UNBLOCK_REQUEST,
             arguments = listOf(navArgument("domain") { type = NavType.StringType }),
             deepLinks = listOf(
                 navDeepLink { uriPattern = "pause://unblock-request?domain={domain}" }
