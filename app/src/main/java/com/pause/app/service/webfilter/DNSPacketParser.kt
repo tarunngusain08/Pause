@@ -32,6 +32,7 @@ object DNSPacketParser {
      */
     fun extractDnsInfo(ipPacket: ByteArray): IpUdpInfo? {
         if (ipPacket.size < 28) return null
+        // IPv6 (version == 6) is intentionally not handled; such packets are silently passed through.
         if ((ipPacket[0].toInt() and 0xFF) ushr 4 != 4) return null // IPv4
         val ihl = (ipPacket[0].toInt() and 0x0F) * 4
         if (ihl < 20 || ipPacket.size < ihl + 8) return null
@@ -99,9 +100,19 @@ object DNSPacketParser {
     private fun parseQuestion(packet: ByteArray, offset: Int): String? {
         val labels = mutableListOf<String>()
         var pos = offset
+        var jumps = 0
         while (pos < packet.size) {
             val len = packet[pos].toInt() and 0xFF
             if (len == 0) break
+            if (len and 0xC0 == 0xC0) {
+                // Compression pointer: upper 2 bits are 11
+                if (pos + 1 >= packet.size) return null
+                if (++jumps > 10) return null // guard against pointer loops
+                val ptr = ((len and 0x3F) shl 8) or (packet[pos + 1].toInt() and 0xFF)
+                if (ptr >= packet.size) return null
+                pos = ptr
+                continue
+            }
             if (len > 63) return null
             pos++
             if (pos + len > packet.size) return null
@@ -113,14 +124,15 @@ object DNSPacketParser {
 
     fun buildNXDomainResponse(query: DNSQuery): ByteArray {
         if (query.rawPacket.size <= 12) return ByteArray(0)
-        val buf = ByteBuffer.allocate(512)
+        val questionBytes = (query.rawPacket.size - 12).coerceAtMost(500)
+        val buf = ByteBuffer.allocate(12 + questionBytes)
         buf.putShort(query.transactionId)
         buf.putShort(0x8183.toShort()) // Response, Authoritative, NXDOMAIN
         buf.putShort(1)       // 1 question
         buf.putShort(0)      // 0 answers
         buf.putShort(0)
         buf.putShort(0)
-        buf.put(query.rawPacket, 12, query.rawPacket.size - 12)
+        buf.put(query.rawPacket, 12, questionBytes)
         buf.flip()
         return ByteArray(buf.remaining()).also { buf.get(it) }
     }
