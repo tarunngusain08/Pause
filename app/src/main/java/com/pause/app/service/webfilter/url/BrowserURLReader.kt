@@ -52,7 +52,12 @@ class BrowserURLReader @Inject constructor() {
         for (i in 0 until root.childCount) {
             val child = root.getChild(i) ?: continue
             val found = findNodeByViewId(child, viewId)
-            if (found != null) return found
+            if (found != null) {
+                // Recycle the child only if it is not the found node itself
+                if (found !== child) child.recycle()
+                return found
+            }
+            child.recycle()
         }
         return null
     }
@@ -65,6 +70,7 @@ class BrowserURLReader @Inject constructor() {
         for (i in 0 until root.childCount) {
             val child = root.getChild(i) ?: continue
             val found = findUrlInEditTexts(child)
+            child.recycle()
             if (found != null) return found
         }
         return null
