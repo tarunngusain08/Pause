@@ -43,9 +43,10 @@ class URLClassifier @Inject constructor(
 
     private fun extractPath(url: String): String {
         return try {
-            val pathStart = url.indexOf('/', url.indexOf("://") + 3)
-            if (pathStart < 0) ""
-            else url.substring(pathStart)
+            val schemeEnd = url.indexOf("://")
+            if (schemeEnd < 0) return ""
+            val pathStart = url.indexOf('/', schemeEnd + 3)
+            if (pathStart < 0) "" else url.substring(pathStart)
         } catch (_: Exception) {
             ""
         }
