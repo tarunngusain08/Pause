@@ -43,7 +43,7 @@ object DatabaseModule {
             context
         }
         return Room.databaseBuilder(dbContext, PauseDatabase::class.java, "pause_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 
@@ -131,6 +131,34 @@ object DatabaseModule {
                     upstream_dns TEXT NOT NULL DEFAULT '8.8.8.8'
                 )
             """.trimIndent())
+        }
+    }
+
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Add unique constraints and indices
+
+            // blacklisted_domains: unique index on domain
+            db.execSQL("DROP INDEX IF EXISTS index_blacklisted_domains_domain")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_blacklisted_domains_domain ON blacklisted_domains(domain)")
+
+            // whitelisted_domains: unique index on domain
+            db.execSQL("DROP INDEX IF EXISTS index_whitelisted_domains_domain")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_whitelisted_domains_domain ON whitelisted_domains(domain)")
+
+            // keyword_entries: unique index on (keyword, category)
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_keyword_entries_keyword_category ON keyword_entries(keyword, category)")
+
+            // sessions: index on is_active
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_sessions_is_active ON sessions(is_active)")
+
+            // url_visit_log: indices on visited_at and parent_reviewed
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_url_visit_log_visited_at ON url_visit_log(visited_at)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_url_visit_log_parent_reviewed ON url_visit_log(parent_reviewed)")
+
+            // pending_review: indices on status and flagged_at
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_review_status ON pending_review(status)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_review_flagged_at ON pending_review(flagged_at)")
         }
     }
 
