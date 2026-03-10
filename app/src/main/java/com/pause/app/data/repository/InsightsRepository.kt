@@ -4,6 +4,7 @@ import com.pause.app.data.db.dao.LaunchEventDao
 import com.pause.app.data.db.dao.ReflectionResponseDao
 import com.pause.app.data.db.dao.UnlockEventDao
 import com.pause.app.data.db.entity.LaunchEvent
+import com.pause.app.data.db.entity.UnlockEvent
 import com.pause.app.util.DateUtils
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -31,6 +32,10 @@ class InsightsRepository @Inject constructor(
 
     suspend fun getUnlockCountSince(since: Long): Int =
         unlockEventDao.getUnlockCountSince(since)
+
+    suspend fun recordUnlock() {
+        unlockEventDao.insert(UnlockEvent(unlockedAt = System.currentTimeMillis()))
+    }
 
     suspend fun deleteReflectionResponsesOlderThan(before: Long) =
         reflectionResponseDao.deleteOlderThan(before)
