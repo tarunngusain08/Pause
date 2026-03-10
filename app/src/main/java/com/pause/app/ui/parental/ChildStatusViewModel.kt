@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -21,6 +24,9 @@ class ChildStatusViewModel @Inject constructor(
 
     private val _currentBand = MutableStateFlow("FREE")
     val currentBand: StateFlow<String> = _currentBand.asStateFlow()
+
+    private val _nextBandChange = MutableStateFlow<String?>(null)
+    val nextBandChange: StateFlow<String?> = _nextBandChange.asStateFlow()
 
     private var bandPollJob: Job? = null
 
@@ -37,6 +43,13 @@ class ChildStatusViewModel @Inject constructor(
     private suspend fun refreshBand() {
         val band = scheduleEngine.getCurrentBand()
         _currentBand.update { band.name }
+        val next = scheduleEngine.getNextBandChange()
+        _nextBandChange.update {
+            next?.let { bc ->
+                val formatter = SimpleDateFormat("EEE, h:mm a", Locale.getDefault())
+                "${bc.newBand.name} at ${formatter.format(Date(bc.changeAt))}"
+            }
+        }
     }
 
     override fun onCleared() {
