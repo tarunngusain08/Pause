@@ -20,6 +20,9 @@ class BlacklistRepository @Inject constructor(
     suspend fun getByDomain(domain: String): BlacklistedDomain? =
         blacklistedDomainDao.getByDomain(normalizeDomain(domain))
 
+    suspend fun isDomainBlacklisted(domain: String): Boolean =
+        getByDomain(domain) != null
+
     suspend fun addDomain(domain: BlacklistedDomain): Long =
         blacklistedDomainDao.insert(domain.copy(domain = normalizeDomain(domain.domain)))
 
