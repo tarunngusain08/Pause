@@ -4,6 +4,7 @@ import com.pause.app.data.db.dao.LaunchEventDao
 import com.pause.app.data.db.entity.LaunchEvent
 import com.pause.app.util.DateUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,6 +17,18 @@ class LaunchRepository @Inject constructor(
     fun getTodayLaunches(packageName: String): Flow<Int> {
         val midnight = DateUtils.getTodayMidnight()
         return launchEventDao.getTodayLaunchCount(packageName, midnight)
+    }
+
+    suspend fun getTodayLaunchCount(packageName: String): Int {
+        val midnight = DateUtils.getTodayMidnight()
+        return launchEventDao.getTodayLaunchCount(packageName, midnight).first()
+    }
+
+    suspend fun getYesterdayTotalLaunchCount(): Int {
+        val yesterdayStart = DateUtils.getYesterdayMidnight()
+        val todayStart = DateUtils.getTodayMidnight()
+        return launchEventDao.getLaunchEventsSince(yesterdayStart).first()
+            .count { it.launchedAt in yesterdayStart until todayStart && !it.wasCancelled }
     }
 
     fun getTodayLaunchesAll(): Flow<Map<String, Int>> {
