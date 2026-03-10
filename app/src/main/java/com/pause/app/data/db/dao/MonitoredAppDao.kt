@@ -25,7 +25,7 @@ interface MonitoredAppDao {
     @Query("SELECT * FROM monitored_apps WHERE package_name = :packageName LIMIT 1")
     suspend fun getByPackageName(packageName: String): MonitoredApp?
 
-    @Query("SELECT COUNT(*) FROM monitored_apps WHERE package_name = :packageName AND is_active = 1")
+    @Query("SELECT (COUNT(*) > 0) FROM monitored_apps WHERE package_name = :packageName AND is_active = 1")
     suspend fun isMonitored(packageName: String): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
