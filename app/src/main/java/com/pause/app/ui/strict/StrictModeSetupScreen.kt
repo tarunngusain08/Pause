@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -44,9 +45,10 @@ fun StrictModeSetupScreen(
     val uiState by viewModel.uiState.collectAsState()
     val activeSession by viewModel.activeSession.collectAsState()
 
-    if (activeSession != null) {
-        onSessionStarted()
-        return
+    LaunchedEffect(activeSession) {
+        if (activeSession != null) {
+            onSessionStarted()
+        }
     }
 
     Column(
