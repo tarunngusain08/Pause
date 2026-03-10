@@ -6,9 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.pause.app.data.db.entity.Session
 import com.pause.app.data.db.entity.MonitoredApp
 import com.pause.app.data.repository.AppRepository
+import com.pause.app.data.repository.InsightsRepository
 import com.pause.app.data.repository.LaunchRepository
 import com.pause.app.data.preferences.PreferencesManager
 import com.pause.app.data.repository.StreakRepository
+import com.pause.app.service.AllowanceTracker
+import com.pause.app.service.parental.ParentalControlManager
 import com.pause.app.service.strict.StrictSessionManager
 import com.pause.app.util.PermissionHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,7 +39,10 @@ class HomeViewModel @Inject constructor(
     private val launchRepository: LaunchRepository,
     private val streakRepository: StreakRepository,
     private val strictSessionManager: StrictSessionManager,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val allowanceTracker: AllowanceTracker,
+    private val insightsRepository: InsightsRepository,
+    private val parentalControlManager: ParentalControlManager
 ) : ViewModel() {
 
     val monitoredApps: StateFlow<List<MonitoredApp>> =
@@ -53,6 +59,15 @@ class HomeViewModel @Inject constructor(
     val streak = streakRepository.getStreakFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val parentalActive = parentalControlManager.isActive
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    private val _remainingAllowanceMinutes = MutableStateFlow<Int?>(null)
+    val remainingAllowanceMinutes: StateFlow<Int?> = _remainingAllowanceMinutes.asStateFlow()
+
+    private val _unlocksToday = MutableStateFlow(0)
+    val unlocksToday: StateFlow<Int> = _unlocksToday.asStateFlow()
+
     private val _costOfScrollMinutes = MutableStateFlow<Int?>(null)
     val costOfScrollMinutes: StateFlow<Int?> = _costOfScrollMinutes.asStateFlow()
 
@@ -65,6 +80,15 @@ class HomeViewModel @Inject constructor(
                 val avgMinutes = 5
                 val estimated = yesterdayLaunches * avgMinutes
                 if (estimated > 0) _costOfScrollMinutes.value = estimated
+            }
+        }
+        viewModelScope.launch {
+            val remaining = allowanceTracker.getRemainingAllowanceMinutes()
+            if (remaining != Int.MAX_VALUE) _remainingAllowanceMinutes.value = remaining
+        }
+        viewModelScope.launch {
+            insightsRepository.getDailyUnlockCount().collect { count ->
+                _unlocksToday.value = count
             }
         }
     }
