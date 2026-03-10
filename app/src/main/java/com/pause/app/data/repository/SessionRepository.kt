@@ -15,6 +15,10 @@ class SessionRepository @Inject constructor(
 
     fun getActiveSessionFlow(): Flow<Session?> = sessionDao.getActiveSessionFlow()
 
+    fun getActiveFocusSessionFlow(): Flow<Session?> = sessionDao.getActiveFocusSessionFlow()
+
+    fun getActiveCommitmentSessionFlow(): Flow<Session?> = sessionDao.getActiveCommitmentSessionFlow()
+
     suspend fun insertSession(session: Session): Long = sessionDao.insert(session)
 
     suspend fun updateSession(session: Session) = sessionDao.update(session)
@@ -39,6 +43,11 @@ class SessionRepository @Inject constructor(
         return sessionDao.insert(session)
     }
 
+    /**
+     * Returns the active focus session, or null if none exists or the session has expired.
+     * NOTE: intentionally marks expired sessions as inactive as a lazy expiry mechanism;
+     * callers should be aware this is a read-with-side-effect.
+     */
     suspend fun getActiveFocusSession(): Session? {
         val session = sessionDao.getActiveFocusSession() ?: return null
         if (System.currentTimeMillis() >= session.endsAt) {
@@ -48,6 +57,11 @@ class SessionRepository @Inject constructor(
         return session
     }
 
+    /**
+     * Returns the active commitment session, or null if none exists or the session has expired.
+     * NOTE: intentionally marks expired sessions as inactive as a lazy expiry mechanism;
+     * callers should be aware this is a read-with-side-effect.
+     */
     suspend fun getActiveCommitmentSession(): Session? {
         val session = sessionDao.getActiveCommitmentSession() ?: return null
         if (System.currentTimeMillis() >= session.endsAt) {
