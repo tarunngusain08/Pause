@@ -34,7 +34,50 @@ class OverlayManager @Inject constructor(
 
     fun getState(): OverlayState = currentState
 
-    fun showDelayOverlay(packageName: String, appName: String, delaySeconds: Int) {
+    fun showReflectionOverlay(
+        packageName: String,
+        appName: String,
+        onReasonSelected: (String) -> Unit
+    ) {
+        if (currentState != OverlayState.IDLE) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+            Log.w(TAG, "Overlay permission not granted, skipping reflection overlay")
+            return
+        }
+        currentState = OverlayState.SHOWING_REFLECTION
+        val overlay = ReflectionOverlayView(context, appName) { reason ->
+            dismissOverlay()
+            onReasonSelected(reason)
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            },
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.CENTER }
+        try {
+            currentOverlay = overlay
+            windowManager.addView(overlay, params)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to attach reflection overlay", e)
+            currentOverlay = null
+            currentState = OverlayState.IDLE
+        }
+    }
+
+    fun showDelayOverlay(
+        packageName: String,
+        appName: String,
+        delaySeconds: Int,
+        reflectionReason: String? = null
+    ) {
         if (currentState != OverlayState.IDLE) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
@@ -52,7 +95,8 @@ class OverlayManager @Inject constructor(
                             packageName = packageName,
                             launchedAt = System.currentTimeMillis(),
                             wasCancelled = true,
-                            delayDurationSeconds = delaySeconds
+                            delayDurationSeconds = delaySeconds,
+                            reflectionReason = reflectionReason
                         )
                     )
                     dismissOverlay()
@@ -66,7 +110,8 @@ class OverlayManager @Inject constructor(
                             packageName = packageName,
                             launchedAt = System.currentTimeMillis(),
                             wasCancelled = false,
-                            delayDurationSeconds = delaySeconds
+                            delayDurationSeconds = delaySeconds,
+                            reflectionReason = reflectionReason
                         )
                     )
                     dismissOverlay()
@@ -110,6 +155,9 @@ class OverlayManager @Inject constructor(
         val dismissable = setOf(
             OverlayState.SHOWING_STRICT_BLOCK,
             OverlayState.SHOWING_DELAY,
+            OverlayState.SHOWING_LAUNCH_LIMIT,
+            OverlayState.SHOWING_ALLOWANCE_REACHED,
+            OverlayState.SHOWING_COOLDOWN,
             OverlayState.SHOWING_PARENTAL_BLOCK,
             OverlayState.SHOWING_POWER_BLOCK,
             OverlayState.SHOWING_EMERGENCY_CONFIRM,
@@ -226,6 +274,94 @@ class OverlayManager @Inject constructor(
         addOverlayToWindow(overlay)
     }
 
+    fun showAllowanceReachedOverlay(
+        onOpenAnyway: () -> Unit,
+        onImDone: () -> Unit
+    ) {
+        if (currentState != OverlayState.IDLE) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+
+        currentState = OverlayState.SHOWING_ALLOWANCE_REACHED
+        val overlay = AllowanceReachedOverlayView(
+            context = context,
+            onOpenAnyway = {
+                dismissOverlay()
+                onOpenAnyway()
+            },
+            onImDone = {
+                dismissOverlay()
+                navigateHome()
+                onImDone()
+            }
+        )
+        addOverlayToWindow(overlay)
+    }
+
+    fun showCommitmentBlockOverlay(onBreakCommitment: () -> Unit) {
+        if (currentState != OverlayState.IDLE) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+
+        currentState = OverlayState.SHOWING_COMMITMENT_BLOCK
+        val overlay = CommitmentBlockOverlayView(context) {
+            dismissOverlay()
+            onBreakCommitment()
+        }
+        addOverlayToWindow(overlay)
+    }
+
+    fun showCooldownOverlay(
+        durationSeconds: Int,
+        onCancel: () -> Unit,
+        onComplete: () -> Unit
+    ) {
+        if (currentState != OverlayState.IDLE) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+
+        currentState = OverlayState.SHOWING_COOLDOWN
+        val overlay = CooldownOverlayView(
+            context = context,
+            durationSeconds = durationSeconds,
+            onCancel = {
+                dismissOverlay()
+                onCancel()
+            },
+            onComplete = {
+                dismissOverlay()
+                onComplete()
+            }
+        )
+        addOverlayToWindow(overlay)
+    }
+
+    fun showLaunchLimitOverlay(
+        appName: String,
+        currentCount: Int,
+        limit: Int,
+        onOpenAnyway: () -> Unit,
+        onSkip: () -> Unit
+    ) {
+        if (currentState != OverlayState.IDLE) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+
+        currentState = OverlayState.SHOWING_LAUNCH_LIMIT
+        val overlay = LaunchLimitOverlayView(
+            context = context,
+            appName = appName,
+            currentCount = currentCount,
+            limit = limit,
+            onOpenAnyway = {
+                dismissOverlay()
+                onOpenAnyway()
+            },
+            onSkip = {
+                dismissOverlay()
+                navigateHome()
+                onSkip()
+            }
+        )
+        addOverlayToWindow(overlay)
+    }
+
     fun showScheduleResumeOverlay(currentBand: String, nextChange: String) {
         if (currentState != OverlayState.IDLE) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
@@ -274,7 +410,7 @@ class OverlayManager @Inject constructor(
         currentState = OverlayState.IDLE
     }
 
-    private fun navigateHome() {
+    fun navigateHome() {
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
