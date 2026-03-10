@@ -1,5 +1,6 @@
 package com.pause.app.ui.commitment
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,9 +31,9 @@ fun CommitmentModeScreen(
     viewModel: CommitmentModeViewModel = hiltViewModel()
 ) {
     val apps by viewModel.monitoredApps.collectAsState(initial = emptyList())
-    val selectedPackages by viewModel.selectedPackages.collectAsState()
-    val durationIndex by viewModel.selectedDurationIndex.collectAsState()
-    val isStarting by viewModel.isStarting.collectAsState()
+    val selectedPackages by viewModel.selectedPackages.collectAsStateWithLifecycle()
+    val durationIndex by viewModel.selectedDurationIndex.collectAsStateWithLifecycle()
+    val isStarting by viewModel.isStarting.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
