@@ -6,6 +6,8 @@ import android.view.accessibility.AccessibilityEvent
 import com.pause.app.data.db.entity.ReflectionResponse
 import com.pause.app.di.PauseAccessibilityEntryPoint
 import com.pause.app.service.overlay.OverlayManager
+import com.pause.app.service.webfilter.url.URLClassification
+import com.pause.app.service.webfilter.url.URLNormalizer
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,25 +59,47 @@ class PauseAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (!::appEntryPoint.isInitialized) return
+        if (event == null || !::appEntryPoint.isInitialized) return
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> handleWindowStateChanged(event)
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> handleWindowContentChanged(event)
+            else -> { }
+        }
+    }
+
+    private fun handleWindowStateChanged(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
         if (packageName == currentForegroundPackage) return
+
+        // Lock screen intervention (Phase 3): track transitions to launcher as "unlock" proxy
+        val prevPackage = currentForegroundPackage
         currentForegroundPackage = packageName
+        if (isLauncherPackage(packageName) && prevPackage != null && !isLauncherPackage(prevPackage)) {
+            serviceScope.launch {
+                val insights = appEntryPoint.getInsightsRepository()
+                insights.recordUnlock()
+                val fifteenMinAgo = System.currentTimeMillis() - 15 * 60 * 1000
+                val count = insights.getUnlockCountSince(fifteenMinAgo)
+                if (count >= 5) {
+                    overlayManager.showLockInterventionOverlay(count)
+                }
+            }
+        }
 
         if (isExcludedPackage(packageName)) return
 
         serviceScope.launch {
+            val pkg = packageName
             val strictSessionManager = appEntryPoint.getStrictSessionManager()
             val parentalControlManager = appEntryPoint.getParentalControlManager()
 
             // If a strict session is active but this app is NOT blocked, dismiss any
             // lingering strict-block overlay so the user can freely use allowed apps.
             if (strictSessionManager.getActiveSession() != null) {
-                if (strictSessionManager.isPackageBlocked(packageName)) {
-                    val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
-                    val appName = app?.appName ?: packageName
-                    if (currentForegroundPackage != packageName) return@launch
+                if (strictSessionManager.isPackageBlocked(pkg)) {
+                    val app = appEntryPoint.getAppRepository().getByPackageName(pkg)
+                    val appName = app?.appName ?: pkg
+                    if (currentForegroundPackage != pkg) return@launch
                     overlayManager.showStrictBlockOverlay(
                         appName = appName,
                         remainingMs = strictSessionManager.getRemainingMs(),
@@ -91,18 +115,18 @@ class PauseAccessibilityService : AccessibilityService() {
             val commitmentSession = appEntryPoint.getSessionRepository().getActiveCommitmentSession()
             if (commitmentSession != null &&
                 appEntryPoint.getSessionRepository().isPackageInCommitmentBlockList(
-                    commitmentSession, packageName
+                    commitmentSession, pkg
                 )
             ) {
-                val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
-                val appName = app?.appName ?: packageName
-                if (currentForegroundPackage != packageName) return@launch
+                val app = appEntryPoint.getAppRepository().getByPackageName(pkg)
+                val appName = app?.appName ?: pkg
+                if (currentForegroundPackage != pkg) return@launch
                 overlayManager.showCommitmentBlockOverlay {
                     serviceScope.launch {
                         appEntryPoint.getSessionRepository().markSessionBroken(
                             commitmentSession.id, System.currentTimeMillis()
                         )
-                        if (currentForegroundPackage != packageName) return@launch
+                        if (currentForegroundPackage != pkg) return@launch
                         overlayManager.showCooldownOverlay(
                             durationSeconds = 90,
                             onCancel = { overlayManager.navigateHome() },
@@ -113,32 +137,32 @@ class PauseAccessibilityService : AccessibilityService() {
                 return@launch
             }
 
-            if (parentalControlManager.isAppBlocked(packageName)) {
+            if (parentalControlManager.isAppBlocked(pkg)) {
                 val blockedApp = appEntryPoint.getParentalBlockedAppRepository()
-                    .getByPackageName(packageName)
+                    .getByPackageName(pkg)
                 val appName = blockedApp?.appName
-                    ?: appEntryPoint.getAppRepository().getByPackageName(packageName)?.appName
-                    ?: packageName
-                if (currentForegroundPackage != packageName) return@launch
-                parentalControlManager.handleAppLaunch(packageName, appName)
+                    ?: appEntryPoint.getAppRepository().getByPackageName(pkg)?.appName
+                    ?: pkg
+                if (currentForegroundPackage != pkg) return@launch
+                parentalControlManager.handleAppLaunch(pkg, appName)
                 return@launch
             }
-            if (parentalControlManager.isAppFrictionRequired(packageName)) {
+            if (parentalControlManager.isAppFrictionRequired(pkg)) {
                 val blockedApp = appEntryPoint.getParentalBlockedAppRepository()
-                    .getByPackageName(packageName)
-                val appName = blockedApp?.appName ?: packageName
+                    .getByPackageName(pkg)
+                val appName = blockedApp?.appName ?: pkg
                 val delaySeconds =
                     appEntryPoint.getPreferencesManager().getDelayDurationSeconds()
-                if (currentForegroundPackage != packageName) return@launch
-                overlayManager.showDelayOverlay(packageName, appName, delaySeconds)
+                if (currentForegroundPackage != pkg) return@launch
+                overlayManager.showDelayOverlay(pkg, appName, delaySeconds)
                 return@launch
             }
-            if (shouldIntercept(packageName)) {
-                val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
-                val appName = app?.appName ?: packageName
+            if (shouldIntercept(pkg)) {
+                val app = appEntryPoint.getAppRepository().getByPackageName(pkg)
+                val appName = app?.appName ?: pkg
                 val baseDelay =
                     appEntryPoint.getPreferencesManager().getDelayDurationSeconds()
-                if (currentForegroundPackage != packageName) return@launch
+                if (currentForegroundPackage != pkg) return@launch
 
                 // Check daily allowance (Phase 2)
                 val phase2Enabled =
@@ -149,9 +173,9 @@ class PauseAccessibilityService : AccessibilityService() {
                     overlayManager.showAllowanceReachedOverlay(
                         onOpenAnyway = {
                             serviceScope.launch {
-                                if (currentForegroundPackage != packageName) return@launch
+                                if (currentForegroundPackage != pkg) return@launch
                                 proceedToDelayOrReflection(
-                                    packageName, appName, baseDelay, app,
+                                    pkg, appName, baseDelay, app,
                                     overlayManager, appEntryPoint
                                 )
                             }
@@ -165,7 +189,7 @@ class PauseAccessibilityService : AccessibilityService() {
                 val limit = app?.dailyLaunchLimit
                 if (limit != null) {
                     val todayCount =
-                        appEntryPoint.getLaunchRepository().getTodayLaunchCount(packageName)
+                        appEntryPoint.getLaunchRepository().getTodayLaunchCount(pkg)
                     if (todayCount >= limit) {
                         overlayManager.showLaunchLimitOverlay(
                             appName = appName,
@@ -173,9 +197,9 @@ class PauseAccessibilityService : AccessibilityService() {
                             limit = limit,
                             onOpenAnyway = {
                                 serviceScope.launch {
-                                    if (currentForegroundPackage != packageName) return@launch
+                                    if (currentForegroundPackage != pkg) return@launch
                                     proceedToDelayOrReflection(
-                                        packageName, appName, baseDelay, app,
+                                        pkg, appName, baseDelay, app,
                                         overlayManager, appEntryPoint
                                     )
                                 }
@@ -187,7 +211,7 @@ class PauseAccessibilityService : AccessibilityService() {
                 }
 
                 proceedToDelayOrReflection(
-                    packageName, appName, baseDelay, app, overlayManager, appEntryPoint
+                    pkg, appName, baseDelay, app, overlayManager, appEntryPoint
                 )
                 return@launch
             }
@@ -195,6 +219,30 @@ class PauseAccessibilityService : AccessibilityService() {
             // User navigated to an app that is neither blocked nor monitored —
             // dismiss any lingering overlay from a previously blocked app.
             overlayManager.dismiss()
+        }
+    }
+
+    private fun handleWindowContentChanged(event: AccessibilityEvent) {
+        val packageName = event.packageName?.toString() ?: return
+        if (!appEntryPoint.getBrowserURLReader().isKnownBrowser(packageName)) return
+        val rootNode = rootInActiveWindow ?: return
+        val rawUrl = try {
+            appEntryPoint.getBrowserURLReader().extractURL(rootNode, packageName)
+        } finally {
+            rootNode.recycle()
+        } ?: return
+        serviceScope.launch {
+            val config = appEntryPoint.getWebFilterConfigRepository().getConfig()
+            if (config == null || !config.urlReaderEnabled) return@launch
+            val domain = URLNormalizer.extractDomain(rawUrl) ?: return@launch
+            val (classification, _) = appEntryPoint.getURLClassifier().classify(rawUrl, domain)
+            appEntryPoint.getURLCaptureQueue().enqueue(
+                url = rawUrl,
+                domain = domain,
+                browserPackage = packageName,
+                classification = classification,
+                wasBlocked = classification == URLClassification.BLACKLISTED
+            )
         }
     }
 
@@ -254,6 +302,9 @@ class PauseAccessibilityService : AccessibilityService() {
         return packageName in EXCLUDED_PACKAGES
     }
 
+    private fun isLauncherPackage(packageName: String): Boolean =
+        packageName in LAUNCHER_PACKAGES
+
     private suspend fun shouldIntercept(packageName: String): Boolean =
         appEntryPoint.getAppRepository().isMonitored(packageName)
 
@@ -268,6 +319,12 @@ class PauseAccessibilityService : AccessibilityService() {
             "com.sec.android.app.launcher",
             "com.android.settings",
             "com.android.packageinstaller"
+        )
+        private val LAUNCHER_PACKAGES = setOf(
+            "com.android.launcher",
+            "com.android.launcher3",
+            "com.google.android.apps.nexuslauncher",
+            "com.sec.android.app.launcher"
         )
     }
 }
