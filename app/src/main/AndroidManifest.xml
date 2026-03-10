@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
         Android 11+ (API 30) Package Visibility: declare that we need to query all apps that
@@ -88,6 +89,15 @@
                 <action android:name="com.pause.app.SCHEDULE_BAND_CHANGE" />
             </intent-filter>
         </receiver>
+
+        <service
+            android:name=".service.webfilter.PauseVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".receiver.PauseDeviceAdminReceiver"
