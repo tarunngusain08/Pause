@@ -17,6 +17,7 @@ class CooldownOverlayView(
 
     private val countdownText: TextView
     private var timer: CountDownTimer? = null
+    private var isDismissed = false
 
     init {
         LayoutInflater.from(context).inflate(R.layout.overlay_cooldown, this, true)
@@ -29,13 +30,14 @@ class CooldownOverlayView(
             }
 
             override fun onFinish() {
-                onComplete()
+                if (!isDismissed) onComplete()
             }
         }.start()
     }
 
     override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
+        isDismissed = true
         timer?.cancel()
+        super.onDetachedFromWindow()
     }
 }
