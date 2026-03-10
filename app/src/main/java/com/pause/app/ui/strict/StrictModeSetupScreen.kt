@@ -1,5 +1,6 @@
 package com.pause.app.ui.strict
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,8 +43,8 @@ fun StrictModeSetupScreen(
     onBack: () -> Unit,
     viewModel: StrictModeSetupViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val activeSession by viewModel.activeSession.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val activeSession by viewModel.activeSession.collectAsStateWithLifecycle()
 
     LaunchedEffect(activeSession) {
         if (activeSession != null) {
