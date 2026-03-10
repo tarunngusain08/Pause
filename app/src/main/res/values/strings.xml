@@ -6,4 +6,5 @@
     <string name="strict_mode_notification_title">Strict Mode active</string>
     <string name="launch_limit_message">You\'ve opened %1$s %2$d times today. Your limit is %3$d.</string>
     <string name="web_filter_channel">Web Filter</string>
+    <string name="lock_intervention_message">You\'ve unlocked your phone %d times in the last 15 minutes.</string>
 </resources>
