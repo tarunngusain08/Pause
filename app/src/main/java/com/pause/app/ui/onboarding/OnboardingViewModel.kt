@@ -52,6 +52,9 @@ class OnboardingViewModel @Inject constructor(
             _onboardingComplete.value = preferencesManager.onboardingComplete.first()
             _isReady.value = true
         }
+        // Eagerly populate permission state so the UI is correct on first display
+        // (ON_RESUME DisposableEffect may not fire before first composition).
+        refreshPermissions()
     }
 
     fun refreshPermissions() {
