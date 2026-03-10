@@ -2,9 +2,13 @@ package com.pause.app.data.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "url_visit_log")
+@Entity(
+    tableName = "url_visit_log",
+    indices = [Index(value = ["visited_at"]), Index(value = ["parent_reviewed"])]
+)
 data class UrlVisitLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "full_url") val fullUrl: String, // truncated at 500 chars
