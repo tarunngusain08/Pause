@@ -121,8 +121,8 @@ class StrictSessionManager @Inject constructor(
 
     fun onSessionExpired() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                val session = _activeSession.value ?: return@withContext
+            val durationMs = withContext(Dispatchers.IO) {
+                val session = _activeSession.value ?: return@launch
                 strictSessionRepository.markComplete(session.id)
                 sessionPreferences.anyStrictActive = false
                 _activeSession.value = null
@@ -132,9 +132,9 @@ class StrictSessionManager @Inject constructor(
                 }
                 context.startService(stopIntent)
 
-                val durationMs = session.endsAt - session.startedAt
-                overlayManager.showSessionCompleteOverlay(durationMs)
+                session.endsAt - session.startedAt
             }
+            overlayManager.showSessionCompleteOverlay(durationMs)
         }
     }
 
