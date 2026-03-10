@@ -3,12 +3,14 @@ package com.pause.app.service
 import android.accessibilityservice.AccessibilityService
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import com.pause.app.data.db.entity.ReflectionResponse
 import com.pause.app.di.PauseAccessibilityEntryPoint
 import com.pause.app.service.overlay.OverlayManager
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class PauseAccessibilityService : AccessibilityService() {
@@ -85,6 +87,32 @@ class PauseAccessibilityService : AccessibilityService() {
                 }
             }
 
+            // Commitment mode (Phase 3): block apps in active commitment session
+            val commitmentSession = appEntryPoint.getSessionRepository().getActiveCommitmentSession()
+            if (commitmentSession != null &&
+                appEntryPoint.getSessionRepository().isPackageInCommitmentBlockList(
+                    commitmentSession, packageName
+                )
+            ) {
+                val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
+                val appName = app?.appName ?: packageName
+                if (currentForegroundPackage != packageName) return@launch
+                overlayManager.showCommitmentBlockOverlay {
+                    serviceScope.launch {
+                        appEntryPoint.getSessionRepository().markSessionBroken(
+                            commitmentSession.id, System.currentTimeMillis()
+                        )
+                        if (currentForegroundPackage != packageName) return@launch
+                        overlayManager.showCooldownOverlay(
+                            durationSeconds = 90,
+                            onCancel = { overlayManager.navigateHome() },
+                            onComplete = { overlayManager.navigateHome() }
+                        )
+                    }
+                }
+                return@launch
+            }
+
             if (parentalControlManager.isAppBlocked(packageName)) {
                 val blockedApp = appEntryPoint.getParentalBlockedAppRepository()
                     .getByPackageName(packageName)
@@ -108,16 +136,116 @@ class PauseAccessibilityService : AccessibilityService() {
             if (shouldIntercept(packageName)) {
                 val app = appEntryPoint.getAppRepository().getByPackageName(packageName)
                 val appName = app?.appName ?: packageName
-                val delaySeconds =
+                val baseDelay =
                     appEntryPoint.getPreferencesManager().getDelayDurationSeconds()
                 if (currentForegroundPackage != packageName) return@launch
-                overlayManager.showDelayOverlay(packageName, appName, delaySeconds)
+
+                // Check daily allowance (Phase 2)
+                val phase2Enabled =
+                    appEntryPoint.getFeatureFlags().isPhase2Enabled.first()
+                if (phase2Enabled &&
+                    appEntryPoint.getAllowanceTracker().hasAllowanceReached()
+                ) {
+                    overlayManager.showAllowanceReachedOverlay(
+                        onOpenAnyway = {
+                            serviceScope.launch {
+                                if (currentForegroundPackage != packageName) return@launch
+                                proceedToDelayOrReflection(
+                                    packageName, appName, baseDelay, app,
+                                    overlayManager, appEntryPoint
+                                )
+                            }
+                        },
+                        onImDone = { }
+                    )
+                    return@launch
+                }
+
+                // Check launch limit (Phase 2)
+                val limit = app?.dailyLaunchLimit
+                if (limit != null) {
+                    val todayCount =
+                        appEntryPoint.getLaunchRepository().getTodayLaunchCount(packageName)
+                    if (todayCount >= limit) {
+                        overlayManager.showLaunchLimitOverlay(
+                            appName = appName,
+                            currentCount = todayCount,
+                            limit = limit,
+                            onOpenAnyway = {
+                                serviceScope.launch {
+                                    if (currentForegroundPackage != packageName) return@launch
+                                    proceedToDelayOrReflection(
+                                        packageName, appName, baseDelay, app,
+                                        overlayManager, appEntryPoint
+                                    )
+                                }
+                            },
+                            onSkip = { }
+                        )
+                        return@launch
+                    }
+                }
+
+                proceedToDelayOrReflection(
+                    packageName, appName, baseDelay, app, overlayManager, appEntryPoint
+                )
                 return@launch
             }
 
             // User navigated to an app that is neither blocked nor monitored —
             // dismiss any lingering overlay from a previously blocked app.
             overlayManager.dismiss()
+        }
+    }
+
+    private suspend fun proceedToDelayOrReflection(
+        packageName: String,
+        appName: String,
+        baseDelay: Int,
+        app: com.pause.app.data.db.entity.MonitoredApp?,
+        overlayManager: OverlayManager,
+        appEntryPoint: PauseAccessibilityEntryPoint
+    ) {
+        if (currentForegroundPackage != packageName) return
+        showDelayOrReflection(
+            packageName, appName, baseDelay, app, overlayManager, appEntryPoint
+        )
+    }
+
+    private suspend fun showDelayOrReflection(
+        packageName: String,
+        appName: String,
+        baseDelay: Int,
+        app: com.pause.app.data.db.entity.MonitoredApp?,
+        overlayManager: OverlayManager,
+        appEntryPoint: PauseAccessibilityEntryPoint
+    ) {
+        if (currentForegroundPackage != packageName) return
+        val focusSession = appEntryPoint.getSessionRepository().getActiveFocusSession()
+        val frictionLevel = app?.frictionLevel ?: com.pause.app.data.db.entity.MonitoredApp.FrictionLevel.LOW
+        val (effectiveDelay, forceReflection) = when {
+            focusSession != null -> 20 to true
+            frictionLevel == com.pause.app.data.db.entity.MonitoredApp.FrictionLevel.LOW -> 5 to false
+            frictionLevel == com.pause.app.data.db.entity.MonitoredApp.FrictionLevel.MEDIUM -> 10 to true
+            frictionLevel == com.pause.app.data.db.entity.MonitoredApp.FrictionLevel.HIGH -> 20 to true
+            else -> baseDelay to false
+        }
+        val phase2Enabled = appEntryPoint.getFeatureFlags().isPhase2Enabled.first()
+        if (phase2Enabled || forceReflection) {
+            overlayManager.showReflectionOverlay(packageName, appName) { reason ->
+                serviceScope.launch {
+                    val extraDelay = if (reason == ReflectionResponse.REASON_BORED ||
+                        reason == ReflectionResponse.REASON_HABIT
+                    ) 5 else 0
+                    val totalDelay = effectiveDelay + extraDelay
+                    if (currentForegroundPackage != packageName) return@launch
+                    overlayManager.showDelayOverlay(
+                        packageName, appName, totalDelay, reason
+                    )
+                }
+            }
+        } else {
+            overlayManager.showDelayOverlay(packageName, appName, effectiveDelay)
         }
     }
 
