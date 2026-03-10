@@ -35,6 +35,13 @@ interface LaunchEventDao {
     )
     fun getLaunchEventsSince(since: Long): Flow<List<LaunchEvent>>
 
+    @Query(
+        """SELECT package_name as packageName, COUNT(*) as count FROM launch_events 
+        WHERE launched_at >= :since AND launched_at < :until AND was_cancelled = 0 
+        GROUP BY package_name"""
+    )
+    suspend fun getLaunchCountsBetween(since: Long, until: Long): List<LaunchCount>
+
     @Query("DELETE FROM launch_events WHERE launched_at < :before")
     suspend fun deleteOlderThan(before: Long)
 }
