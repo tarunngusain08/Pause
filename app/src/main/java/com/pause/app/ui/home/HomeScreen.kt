@@ -62,6 +62,7 @@ fun HomeScreen(
     onNavigateToFocus: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
     onNavigateToCommitment: () -> Unit = {},
+    onNavigateToChildStatus: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val monitoredApps by viewModel.monitoredApps.collectAsState(initial = emptyList())
@@ -69,6 +70,9 @@ fun HomeScreen(
     val streak by viewModel.streak.collectAsState(initial = null)
     val costOfScrollMinutes by viewModel.costOfScrollMinutes.collectAsState(initial = null)
     val strictSession by viewModel.strictSession.collectAsState(initial = null)
+    val parentalActive by viewModel.parentalActive.collectAsState(initial = false)
+    val remainingAllowance by viewModel.remainingAllowanceMinutes.collectAsState(initial = null)
+    val unlocksToday by viewModel.unlocksToday.collectAsState(initial = 0)
     val permissionStatus by viewModel.permissionStatus.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -201,6 +205,31 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Daily allowance remaining (Phase 2+)
+        remainingAllowance?.let { remaining ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Daily allowance",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$remaining minutes remaining",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // Streak card (Phase 2+)
         streak?.let { s ->
             Card(
@@ -220,6 +249,28 @@ fun HomeScreen(
                         text = "${s.currentStreakDays} days",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Unlocks today (Phase 3+)
+        if (unlocksToday > 0) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "$unlocksToday unlocks today",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -376,6 +427,16 @@ fun HomeScreen(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text("Parental Control")
+        }
+
+        if (parentalActive) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onNavigateToChildStatus,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View Child Status")
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
