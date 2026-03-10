@@ -139,7 +139,7 @@ class PreferencesManager @Inject constructor(
         private val KEY_PIN_LOCKOUT_UNTIL = longPreferencesKey("pin_lockout_until")
 
         const val DEFAULT_DELAY_SECONDS = 10
-        const val DEFAULT_PHASE = 1
+        const val DEFAULT_PHASE = 2
         const val DEFAULT_ALLOWANCE_MINUTES = 60
 
         const val PHASE_1 = 1
