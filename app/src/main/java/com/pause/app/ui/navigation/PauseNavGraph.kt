@@ -10,9 +10,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.pause.app.ui.appselection.AppSelectionScreen
 import com.pause.app.ui.home.HomeScreen
 import com.pause.app.ui.onboarding.OnboardingScreen
@@ -25,6 +28,12 @@ import com.pause.app.ui.strict.StrictModeSetupScreen
 import com.pause.app.ui.parental.ParentalSetupScreen
 import com.pause.app.ui.parental.ParentDashboardScreen
 import com.pause.app.ui.parental.ChildStatusScreen
+import com.pause.app.ui.webfilter.DomainBlacklistScreen
+import com.pause.app.ui.webfilter.KeywordManagerScreen
+import com.pause.app.ui.webfilter.UnblockRequestScreen
+import com.pause.app.ui.webfilter.UrlVisitLogScreen
+import com.pause.app.ui.webfilter.WebFilterDashboardScreen
+import com.pause.app.ui.webfilter.WhitelistScreen
 
 @Composable
 fun PauseNavGraph() {
@@ -67,7 +76,8 @@ fun PauseNavGraph() {
                 onNavigateToSettings = { navController.navigate("settings") },
                 onNavigateToFocus = { navController.navigate("focus") },
                 onNavigateToInsights = { navController.navigate("weekly_insights") },
-                onNavigateToCommitment = { navController.navigate("commitment_setup") }
+                onNavigateToCommitment = { navController.navigate("commitment_setup") },
+                onNavigateToChildStatus = { navController.navigate("child_status") }
             )
         }
         composable("commitment_setup") {
@@ -122,10 +132,47 @@ fun PauseNavGraph() {
             )
         }
         composable("parent_dashboard") {
-            ParentDashboardScreen(onBack = { navController.popBackStack() })
+            ParentDashboardScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToWebFilter = { navController.navigate("web_filter_dashboard") }
+            )
         }
         composable("child_status") {
-            ChildStatusScreen()
+            ChildStatusScreen(onBack = { navController.popBackStack() })
+        }
+        composable("web_filter_dashboard") {
+            WebFilterDashboardScreen(
+                onNavigateToBlacklist = { navController.navigate("domain_blacklist") },
+                onNavigateToKeywords = { navController.navigate("keyword_manager") },
+                onNavigateToUrlLog = { navController.navigate("url_visit_log") },
+                onNavigateToWhitelist = { navController.navigate("whitelist") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("domain_blacklist") {
+            DomainBlacklistScreen(onBack = { navController.popBackStack() })
+        }
+        composable("keyword_manager") {
+            KeywordManagerScreen(onBack = { navController.popBackStack() })
+        }
+        composable("url_visit_log") {
+            UrlVisitLogScreen(onBack = { navController.popBackStack() })
+        }
+        composable("whitelist") {
+            WhitelistScreen(onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = "unblock_request/{domain}",
+            arguments = listOf(navArgument("domain") { type = NavType.StringType }),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "pause://unblock-request?domain={domain}" }
+            )
+        ) { backStackEntry ->
+            val domain = backStackEntry.arguments?.getString("domain") ?: ""
+            UnblockRequestScreen(
+                domain = domain,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }
