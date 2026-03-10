@@ -1,5 +1,6 @@
 package com.pause.app.service.webfilter
 
+import android.util.Log
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -115,11 +116,19 @@ class PauseVpnService : VpnService() {
                             if (dnsResponse.isNotEmpty()) {
                                 output.write(DNSPacketParser.wrapResponse(dnsResponse, ipUdpInfo))
                             }
-                        } catch (_: Exception) { }
+                        } catch (e: java.io.IOException) {
+                            // fd was closed or revoked; stop the loop
+                            Log.w(TAG, "VPN fd I/O error, stopping loop", e)
+                            break
+                        } catch (e: Exception) {
+                            Log.w(TAG, "DNS packet processing error (ignored)", e)
+                        }
                     }
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            Log.e(TAG, "VPN loop fatal error", e)
+        }
     }
 
     private fun resolveUpstream(upstream: String, packet: ByteArray): ByteArray? {
@@ -177,5 +186,6 @@ class PauseVpnService : VpnService() {
         const val ACTION_STOP = "com.pause.app.VPN_STOP"
         private const val NOTIFICATION_ID = 2000
         private const val CHANNEL_ID = "web_filter"
+        private const val TAG = "PauseVpnService"
     }
 }
