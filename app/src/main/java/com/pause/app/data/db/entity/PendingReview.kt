@@ -2,9 +2,13 @@ package com.pause.app.data.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "pending_review")
+@Entity(
+    tableName = "pending_review",
+    indices = [Index(value = ["status"]), Index(value = ["flagged_at"])]
+)
 data class PendingReview(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "url_visit_log_id") val urlVisitLogId: Long? = null,
