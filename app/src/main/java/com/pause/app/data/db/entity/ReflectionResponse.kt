@@ -29,5 +29,6 @@ data class ReflectionResponse(
         const val REASON_HABIT = "HABIT"
         const val REASON_REPLYING = "REPLYING"
         const val REASON_INTENTIONAL = "INTENTIONAL"
+        const val REASON_TIMED_OUT = "TIMED_OUT"
     }
 }
