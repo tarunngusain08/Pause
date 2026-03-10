@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.pause.app.data.db.entity.WebFilterConfig
 import kotlinx.coroutines.flow.Flow
 
@@ -21,4 +22,13 @@ interface WebFilterConfigDao {
 
     @Query("UPDATE web_filter_config SET vpn_enabled = :enabled WHERE id = 1")
     suspend fun setVpnEnabled(enabled: Boolean)
+
+    /** Atomically ensures a default config row exists, then updates vpn_enabled. */
+    @Transaction
+    suspend fun ensureAndSetVpnEnabled(enabled: Boolean) {
+        if (getConfig() == null) {
+            insertOrReplace(WebFilterConfig(id = 1))
+        }
+        setVpnEnabled(enabled)
+    }
 }
