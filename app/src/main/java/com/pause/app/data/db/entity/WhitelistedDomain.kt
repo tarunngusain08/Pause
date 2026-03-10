@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "whitelisted_domains",
-    indices = [Index(value = ["domain"])]
+    indices = [Index(value = ["domain"], unique = true)]
 )
 data class WhitelistedDomain(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
