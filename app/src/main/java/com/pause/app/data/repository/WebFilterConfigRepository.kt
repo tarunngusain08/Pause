@@ -22,13 +22,6 @@ class WebFilterConfigRepository @Inject constructor(
     }
 
     suspend fun setVpnEnabled(enabled: Boolean) {
-        ensureConfigExists()
-        webFilterConfigDao.setVpnEnabled(enabled)
-    }
-
-    private suspend fun ensureConfigExists() {
-        if (webFilterConfigDao.getConfig() == null) {
-            webFilterConfigDao.insertOrReplace(WebFilterConfig(id = 1))
-        }
+        webFilterConfigDao.ensureAndSetVpnEnabled(enabled)
     }
 }
