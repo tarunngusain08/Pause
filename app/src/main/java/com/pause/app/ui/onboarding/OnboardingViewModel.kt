@@ -18,6 +18,7 @@ enum class OnboardingStep {
     WELCOME,
     OVERLAY,
     ACCESSIBILITY,
+    USAGE_STATS,
     NOTIFICATIONS,
     DONE
 }
@@ -43,6 +44,9 @@ class OnboardingViewModel @Inject constructor(
     private val _hasAccessibility = MutableStateFlow(false)
     val hasAccessibility: StateFlow<Boolean> = _hasAccessibility.asStateFlow()
 
+    private val _hasUsageStats = MutableStateFlow(false)
+    val hasUsageStats: StateFlow<Boolean> = _hasUsageStats.asStateFlow()
+
     init {
         viewModelScope.launch {
             _onboardingComplete.value = preferencesManager.onboardingComplete.first()
@@ -53,6 +57,7 @@ class OnboardingViewModel @Inject constructor(
     fun refreshPermissions() {
         _hasOverlay.value = PermissionHelper.hasOverlayPermission(context)
         _hasAccessibility.value = PermissionHelper.hasAccessibilityServiceEnabled(context)
+        _hasUsageStats.value = PermissionHelper.hasUsageStatsPermission(context)
     }
 
     fun advanceFromWelcome() {
@@ -64,6 +69,10 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun advanceFromAccessibility() {
+        _currentStep.value = OnboardingStep.USAGE_STATS
+    }
+
+    fun advanceFromUsageStats() {
         _currentStep.value = if (PermissionHelper.needsNotificationPermission()) {
             OnboardingStep.NOTIFICATIONS
         } else {
