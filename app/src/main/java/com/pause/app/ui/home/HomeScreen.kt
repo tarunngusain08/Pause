@@ -1,5 +1,6 @@
 package com.pause.app.ui.home
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -41,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,13 +75,14 @@ fun HomeScreen(
     val parentalActive by viewModel.parentalActive.collectAsState(initial = false)
     val remainingAllowance by viewModel.remainingAllowanceMinutes.collectAsState(initial = null)
     val unlocksToday by viewModel.unlocksToday.collectAsState(initial = 0)
-    val permissionStatus by viewModel.permissionStatus.collectAsState()
+    val permissionStatus by viewModel.permissionStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var strictRemainingMs by remember { mutableStateOf(0L) }
     // Tracks whether the user explicitly dismissed the permission dialog this session.
-    var permissionDialogDismissed by remember { mutableStateOf(false) }
+    // rememberSaveable survives configuration changes (rotation) so the dialog doesn't reappear.
+    var permissionDialogDismissed by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(strictSession) {
         if (strictSession != null) {
