@@ -1,5 +1,6 @@
 package com.pause.app.ui.onboarding
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -55,10 +56,10 @@ fun OnboardingScreen(
     onComplete: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
-    val currentStep by viewModel.currentStep.collectAsState()
-    val hasOverlay by viewModel.hasOverlay.collectAsState()
-    val hasAccessibility by viewModel.hasAccessibility.collectAsState()
-    val hasUsageStats by viewModel.hasUsageStats.collectAsState()
+    val currentStep by viewModel.currentStep.collectAsStateWithLifecycle()
+    val hasOverlay by viewModel.hasOverlay.collectAsStateWithLifecycle()
+    val hasAccessibility by viewModel.hasAccessibility.collectAsStateWithLifecycle()
+    val hasUsageStats by viewModel.hasUsageStats.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
