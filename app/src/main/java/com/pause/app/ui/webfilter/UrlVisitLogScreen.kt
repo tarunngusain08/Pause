@@ -1,5 +1,6 @@
 package com.pause.app.ui.webfilter
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +32,7 @@ fun UrlVisitLogScreen(
     onBack: () -> Unit,
     viewModel: UrlVisitLogViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredLogs = viewModel.filteredLogs()
     val formatter = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
 
