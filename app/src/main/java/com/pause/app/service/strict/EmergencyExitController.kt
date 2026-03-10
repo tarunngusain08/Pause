@@ -11,9 +11,10 @@ sealed class EmergencyTapResult {
 @Singleton
 class EmergencyExitController @Inject constructor() {
 
-    private var tapCount = 0
-    private var firstTapAt = 0L
+    @Volatile private var tapCount = 0
+    @Volatile private var firstTapAt = 0L
 
+    @Synchronized
     fun onEmergencyTapped(): EmergencyTapResult {
         val now = System.currentTimeMillis()
         if (tapCount == 0) {
@@ -35,6 +36,7 @@ class EmergencyExitController @Inject constructor() {
         }
     }
 
+    @Synchronized
     fun reset() {
         tapCount = 0
         firstTapAt = 0L
