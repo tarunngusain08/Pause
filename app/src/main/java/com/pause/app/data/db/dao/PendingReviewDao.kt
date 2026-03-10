@@ -21,4 +21,7 @@ interface PendingReviewDao {
 
     @Query("UPDATE pending_review SET status = :status, resolved_at = :resolvedAt WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String, resolvedAt: Long?)
+
+    @Query("DELETE FROM pending_review WHERE flagged_at < :timestamp")
+    suspend fun deleteOlderThan(timestamp: Long)
 }
