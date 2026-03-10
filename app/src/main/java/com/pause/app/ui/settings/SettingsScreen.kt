@@ -28,6 +28,7 @@ fun SettingsScreen(
 ) {
     val delaySeconds by viewModel.delaySeconds.collectAsState()
     val dailyAllowanceMinutes by viewModel.dailyAllowanceMinutes.collectAsState()
+    val currentPhase by viewModel.currentPhase.collectAsState()
 
     Column(
         modifier = Modifier
@@ -107,6 +108,41 @@ fun SettingsScreen(
                         0 -> "No limit"
                         else -> "$minutes minutes"
                     },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Features",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Phase 1: delay only. Phase 2: + reflection, allowance, launch limits. Phase 3: + commitment, lock intervention.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        listOf(1, 2, 3).forEach { phase ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = currentPhase == phase,
+                    onClick = { viewModel.setCurrentPhase(phase) }
+                )
+                Spacer(modifier = Modifier.padding(start = 8.dp))
+                Text(
+                    text = "Phase $phase",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
