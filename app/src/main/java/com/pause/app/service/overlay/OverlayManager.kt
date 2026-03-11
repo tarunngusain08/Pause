@@ -39,6 +39,9 @@ class OverlayManager @Inject constructor(
     /** Returns true if a new overlay with [newState] should preempt the current one. */
     @MainThread
     private fun canShow(newState: OverlayState): Boolean {
+        // Informational overlays only show when the system is fully idle
+        if (newState.isInformational) return currentState == OverlayState.IDLE
+        // Interception overlays preempt lower-priority overlays (including informational)
         if (newState.priority > currentState.priority) {
             dismissOverlay()
             return true
@@ -428,6 +431,16 @@ class OverlayManager @Inject constructor(
     }
 
     @MainThread
+    fun showGentleReentryOverlay() {
+        if (!canShow(OverlayState.SHOWING_GENTLE_REENTRY)) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+
+        currentState = OverlayState.SHOWING_GENTLE_REENTRY
+        val overlay = GentleReentryOverlayView(context) { dismissOverlay() }
+        addOverlayToWindow(overlay)
+    }
+
+    @MainThread
     fun showScheduleResumeOverlay(currentBand: String, nextChange: String) {
         if (!canShow(OverlayState.SHOWING_SCHEDULE_RESUME)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
@@ -444,6 +457,19 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     private fun addOverlayToWindow(overlay: View) {
+        val isBlockOverlay = currentState in BLOCK_OVERLAY_STATES
+        // PIN entry needs keyboard access: use NOT_TOUCH_MODAL instead of NOT_FOCUSABLE
+        val needsFocus = currentState == OverlayState.SHOWING_PIN_ENTRY
+        var flags = if (needsFocus) {
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        } else {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        }
+        if (isBlockOverlay) {
+            flags = flags or WindowManager.LayoutParams.FLAG_SECURE
+        }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -453,8 +479,7 @@ class OverlayManager @Inject constructor(
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            flags,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.CENTER }
         try {
@@ -470,6 +495,7 @@ class OverlayManager @Inject constructor(
     @MainThread
     private fun dismissOverlay() {
         currentOverlay?.let { overlay ->
+            (overlay as? TimerCancellable)?.cancelTimers()
             try {
                 windowManager.removeView(overlay)
             } catch (e: Exception) {
@@ -491,5 +517,12 @@ class OverlayManager @Inject constructor(
 
     companion object {
         private const val TAG = "OverlayManager"
+
+        private val BLOCK_OVERLAY_STATES = setOf(
+            OverlayState.SHOWING_STRICT_BLOCK,
+            OverlayState.SHOWING_PARENTAL_BLOCK,
+            OverlayState.SHOWING_COMMITMENT_BLOCK,
+            OverlayState.SHOWING_PIN_ENTRY
+        )
     }
 }
