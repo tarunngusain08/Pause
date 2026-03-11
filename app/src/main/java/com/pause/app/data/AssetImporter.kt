@@ -84,9 +84,53 @@ class AssetImporter @Inject constructor(
         }
     }
 
+    /**
+     * Seeds known DNS-over-HTTPS resolver domains as non-deletable SYSTEM entries.
+     * These domains are used to bypass VPN-based filtering, so we block them at the DNS level.
+     */
+    suspend fun seedDoHBlocklistIfNeeded() {
+        val now = System.currentTimeMillis()
+        for (domain in DOH_RESOLVER_DOMAINS) {
+            val existing = blacklistedDomainDao.getByDomain(domain)
+            if (existing == null) {
+                blacklistedDomainDao.insert(
+                    BlacklistedDomain(
+                        domain = domain,
+                        source = "SYSTEM",
+                        isActive = true,
+                        addedAt = now,
+                        addedBy = "SYSTEM",
+                        category = "DOH_BYPASS",
+                        pendingParentReview = false
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun importBundledAssetsIfNeeded() {
         importKeywordsIfNeeded()
         importDomainCategoriesIfNeeded()
+        seedDoHBlocklistIfNeeded()
+    }
+
+    companion object {
+        /** Known DNS-over-HTTPS resolver domains that could bypass VPN-based DNS filtering. */
+        private val DOH_RESOLVER_DOMAINS = listOf(
+            "dns.google",
+            "dns64.dns.google",
+            "cloudflare-dns.com",
+            "1dot1dot1dot1.cloudflare-dns.com",
+            "dns.quad9.net",
+            "dns9.quad9.net",
+            "doh.opendns.com",
+            "doh.familyshield.opendns.com",
+            "doh.cleanbrowsing.org",
+            "adblock.dns.mullvad.net",
+            "base.dns.mullvad.net",
+            "doh.dns.sb",
+            "resolver2.dns.watch"
+        )
     }
 
     private fun readAsset(fileName: String): String? {
