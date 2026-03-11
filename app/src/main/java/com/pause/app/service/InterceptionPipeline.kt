@@ -1,5 +1,10 @@
 package com.pause.app.service
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import com.pause.app.data.db.entity.MonitoredApp
 import com.pause.app.data.db.entity.ReflectionResponse
 import com.pause.app.di.PauseAccessibilityEntryPoint
@@ -9,7 +14,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Evaluates an app-foreground event through an ordered interception pipeline:
- * Strict → Commitment → Parental → Standard (monitored apps).
+ * Strict → Commitment → Standard (monitored apps).
  *
  * Each stage either terminates the pipeline (returns true) or falls through.
  */
@@ -17,7 +22,8 @@ class InterceptionPipeline(
     private val overlayManager: OverlayManager,
     private val appEntryPoint: PauseAccessibilityEntryPoint,
     private val serviceScope: CoroutineScope,
-    private val isForeground: (String) -> Boolean
+    private val isForeground: (String) -> Boolean,
+    private val context: Context? = null
 ) {
     /**
      * Evaluate the interception pipeline for the given package.
@@ -26,7 +32,6 @@ class InterceptionPipeline(
     suspend fun evaluate(pkg: String): Boolean {
         return strictStage(pkg)
             || commitmentStage(pkg)
-            || parentalStage(pkg)
             || standardStage(pkg)
             || run { overlayManager.dismiss(); false }
     }
@@ -78,27 +83,7 @@ class InterceptionPipeline(
         return true
     }
 
-    // ── Stage 3: Parental controls ────────────────────────────────────────────
-
-    private suspend fun parentalStage(pkg: String): Boolean {
-        val parentalControlManager = appEntryPoint.getParentalControlManager()
-        if (parentalControlManager.isAppBlocked(pkg)) {
-            val appName = resolveBlockedAppName(pkg)
-            if (!isForeground(pkg)) return true
-            parentalControlManager.handleAppLaunch(pkg, appName)
-            return true
-        }
-        if (parentalControlManager.isAppFrictionRequired(pkg)) {
-            val appName = resolveBlockedAppName(pkg)
-            val delaySeconds = appEntryPoint.getPreferencesManager().getDelayDurationSeconds()
-            if (!isForeground(pkg)) return true
-            overlayManager.showDelayOverlay(pkg, appName, delaySeconds)
-            return true
-        }
-        return false
-    }
-
-    // ── Stage 4: Standard monitored-app friction ──────────────────────────────
+    // ── Stage 3: Standard monitored-app friction ──────────────────────────────
 
     private suspend fun standardStage(pkg: String): Boolean {
         if (!appEntryPoint.getAppRepository().isMonitored(pkg)) return false
@@ -143,8 +128,35 @@ class InterceptionPipeline(
             }
         }
 
+        fireHapticFriction()
         showDelayOrReflection(pkg, appName, baseDelay, app)
         return true
+    }
+
+    // ── Haptic friction ───────────────────────────────────────────────────────
+
+    private fun fireHapticFriction() {
+        val ctx = context ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = ctx.getSystemService(VibratorManager::class.java)
+                val vibrator = vm?.defaultVibrator ?: return
+                val pattern = longArrayOf(0, 80, 60, 80)
+                val amps = intArrayOf(0, 180, 0, 120)
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, amps, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = ctx.getSystemService(Vibrator::class.java) ?: return
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val pattern = longArrayOf(0, 80, 60, 80)
+                    val amps = intArrayOf(0, 180, 0, 120)
+                    vibrator.vibrate(VibrationEffect.createWaveform(pattern, amps, -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(longArrayOf(0, 80, 60, 80), -1)
+                }
+            }
+        } catch (_: Exception) { }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -186,10 +198,4 @@ class InterceptionPipeline(
     private suspend fun resolveAppName(pkg: String): String =
         appEntryPoint.getAppRepository().getByPackageName(pkg)?.appName ?: pkg
 
-    private suspend fun resolveBlockedAppName(pkg: String): String {
-        val blockedApp = appEntryPoint.getParentalBlockedAppRepository().getByPackageName(pkg)
-        return blockedApp?.appName
-            ?: appEntryPoint.getAppRepository().getByPackageName(pkg)?.appName
-            ?: pkg
-    }
 }
