@@ -53,9 +53,9 @@ This document describes how the Pause Android app is structured at the code leve
 - **Application:** `PauseApplication` is annotated with `@HiltAndroidApp` and implements `Configuration.Provider` for WorkManager with `HiltWorkerFactory`.
 - **Modules:** `DatabaseModule` provides `PauseDatabase` and DAOs; `AppModule` provides repositories, overlay manager, session managers, and other app-scoped objects.
 - **Entry Points** (for non-Hilt contexts):
-  - **PauseAccessibilityEntryPoint** — Used by `PauseAccessibilityService` to get `OverlayManager`, `AppRepository`, `SessionRepository`, `LaunchRepository`, `AllowanceTracker`, `PreferencesManager`, `FeatureFlags`, `StrictSessionManager`, `ParentalControlManager`, `ParentalBlockedAppRepository`, `WebFilterConfigRepository`, `BrowserURLReader`, `URLClassifier`, `URLCaptureQueue`, `InsightsRepository`.
-  - **VpnEntryPoint** — Used by `PauseVpnService` to get `BlocklistMatcher`, `WhitelistMatcher`, `WebFilterConfigRepository`.
-  - **BootEntryPoint** — Used by `BootReceiver` to restore VPN or other state after device boot.
+  - **PauseAccessibilityEntryPoint** — Used by `PauseAccessibilityService` to get `OverlayManager`, `AppRepository`, `SessionRepository`, `LaunchRepository`, `AllowanceTracker`, `PreferencesManager`, `FeatureFlags`, `StrictSessionManager`, `ParentalControlManager`, `ParentalBlockedAppRepository`, `WebFilterConfigRepository`, `BrowserURLReader`, `URLClassifier`, `URLCaptureQueue`, `AutoBlacklistEngine`, `InsightsRepository`.
+  - **VpnEntryPoint** — Used by `PauseVpnService` to get `BlocklistMatcher`, `WhitelistMatcher`, `WebFilterConfigRepository` (also exposes `BlacklistRepository`, `WhitelistRepository`).
+  - **BootEntryPoint** — Used by `BootReceiver` to get `StrictSessionManager`, `ParentalControlManager`, `WebFilterConfigRepository` for resuming sessions and VPN after boot.
 
 Only the minimum set of dependencies is exposed per entry point to keep services decoupled from the full graph.
 
@@ -82,13 +82,13 @@ Only the minimum set of dependencies is exposed per entry point to keep services
    - User enables Pause in Settings → Accessibility. `PauseAccessibilityService.onServiceConnected()` runs; it obtains `OverlayManager` and other deps via `PauseAccessibilityEntryPoint` and then handles `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOW_CONTENT_CHANGED` for app interception and URL capture.
 
 4. **Web Filter (if enabled by parent)**  
-   - Parent enables Web Filter from Parent Dashboard; app starts `PauseVpnService` with `ACTION_START`. VPN establishes a TUN interface and runs the DNS loop on a coroutine. BootReceiver can re-start VPN after reboot if it was active.
+   - Parent enables Web Filter from Parent Dashboard; app starts `PauseVpnService` with `ACTION_START`. VPN establishes a TUN interface (excluding the Pause app via `addDisallowedApplication`) and runs the DNS loop on a coroutine. `BootReceiver` re-starts VPN after `BOOT_COMPLETED` / `LOCKED_BOOT_COMPLETED` if `vpnEnabled` was true.
 
 ---
 
 ## 5. Key Cross-Cutting Behaviors
 
-- **Foreground detection** — Only in Accessibility Service; uses `event.packageName` and ignores when it hasn’t changed.
+- **Foreground detection** — Only in Accessibility Service; uses `event.packageName` and ignores when it hasn’t changed. Interception is delegated to **InterceptionPipeline** (Strict → Commitment → Parental → Standard).
 - **Overlays** — All shown via `OverlayManager` (delay, reflection, commitment block, strict block, parental block, lock intervention, PIN entry, etc.). Manager holds a single `currentOverlay` and `OverlayState`; `dismiss()` only clears overlays that are “interception” related, not session-complete or informational ones.
 - **Persistence** — All configuration and behavioral data goes through Room or DataStore; no in-memory-only critical state.
 - **Midnight reset** — `MidnightResetWorker` runs once per day (scheduled for midnight); resets daily counters and evaluates streaks. WorkManager is configured with Hilt so workers can receive repositories via constructor injection.
