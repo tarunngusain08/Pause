@@ -12,13 +12,12 @@ class BlocklistMatcher @Inject constructor(
 ) {
     private val mutex = Mutex()
     /** null = never loaded; empty set = loaded but database is empty */
-    private var snapshot: Set<String>? = null
-    private var lastReload = 0L
+    @Volatile private var snapshot: Set<String>? = null
+    @Volatile private var lastReload = 0L
 
     suspend fun isBlocked(domain: String): Boolean {
-        reloadIfNeeded()
+        val current = getSnapshot()
         val normalized = normalize(domain)
-        val current = mutex.withLock { snapshot } ?: return false
         if (current.contains(normalized)) return true
         return current.any {
             if (!it.startsWith("*.")) return@any false
@@ -28,18 +27,25 @@ class BlocklistMatcher @Inject constructor(
     }
 
     suspend fun reloadFromDB() {
-        val loaded = blacklistRepository.getActiveDomainsAsList().map { it.domain }.toSet()
+        val loaded = blacklistRepository.getActiveDomainsAsList().map { it.domain }.toHashSet()
         mutex.withLock {
             snapshot = loaded
             lastReload = System.currentTimeMillis()
         }
     }
 
-    private suspend fun reloadIfNeeded() {
-        val needsReload = mutex.withLock {
-            snapshot == null || System.currentTimeMillis() - lastReload > 60_000
+    private suspend fun getSnapshot(): Set<String> {
+        // Fast path: check without lock
+        snapshot?.takeIf { System.currentTimeMillis() - lastReload < 60_000 }?.let { return it }
+        // Slow path: acquire lock, check again, then reload
+        return mutex.withLock {
+            snapshot?.takeIf { System.currentTimeMillis() - lastReload < 60_000 } ?: run {
+                val fresh = blacklistRepository.getActiveDomainsAsList().map { it.domain }.toHashSet()
+                snapshot = fresh
+                lastReload = System.currentTimeMillis()
+                fresh
+            }
         }
-        if (needsReload) reloadFromDB()
     }
 
     private fun normalize(domain: String): String =
