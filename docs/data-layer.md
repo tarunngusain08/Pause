@@ -54,7 +54,7 @@ Repositories are provided by Hilt and used by ViewModels and services (via entry
 - **SessionRepository** — Save/get focus and commitment sessions, `getActiveFocusSession()`, `getActiveCommitmentSession()`, `isPackageInCommitmentBlockList()`, `markSessionBroken()`.
 - **StreakDao / StreakRepository** (or equivalent) — Streak read/update, shield use, reset; used at midnight and on commitment break.
 - **InsightsRepository** — Unlock count, weekly/monthly aggregates, daily summary for accountability; uses LaunchEventDao, UnlockEventDao, UsageStatsManager.
-- **AccountabilityRepository** — Partner setup, last summary sent; used by accountability dispatch worker.
+- **AccountabilityRepository** — Partner setup, last summary sent. (AccountabilityDispatchWorker for daily SMS summary is not yet implemented.)
 
 ### Parental and strict
 
@@ -76,13 +76,13 @@ Repositories are provided by Hilt and used by ViewModels and services (via entry
 ## 4. Preferences and Feature Flags
 
 - **PreferencesManager** — Uses **DataStore** (`pause_preferences`). Holds: `delayDurationSeconds`, `onboardingComplete`, `currentPhase`, `dailyAllowanceMinutes`, `lastCostOfScrollShownDate`, `showReEntryPrompt`, parental setup step, PIN hash, recovery phrase hash, PIN attempt/lockout. Provided via Hilt.
-- **FeatureFlags** — Wraps `PreferencesManager.currentPhase`; exposes `isPhase2Enabled`, `isPhase3Enabled` as Flow. Phase is used for feature gating (e.g. allowance, launch limits); reflection in the interception pipeline is driven by friction level (MEDIUM/HIGH) and focus session, not the phase flag.
+- **FeatureFlags** — Wraps `PreferencesManager.currentPhase`; exposes `isPhase2Enabled`, `isPhase3Enabled` as Flow. Phase is used for feature gating (e.g. allowance, launch limits). Not exposed via PauseAccessibilityEntryPoint; reflection in the interception pipeline is driven by friction level (MEDIUM/HIGH) and focus session.
 
 ---
 
 ## 5. Usage from Services
 
-- **PauseAccessibilityService** — Gets dependencies via **PauseAccessibilityEntryPoint**: OverlayManager, AppRepository, LaunchRepository, SessionRepository, AllowanceTracker, PreferencesManager, FeatureFlags, StrictSessionManager, ParentalControlManager, ParentalBlockedAppRepository, WebFilterConfigRepository, BrowserURLReader, URLClassifier, URLCaptureQueue, AutoBlacklistEngine, InsightsRepository. Uses **InterceptionPipeline** for app interception logic.
+- **PauseAccessibilityService** — Gets dependencies via **PauseAccessibilityEntryPoint**: OverlayManager, AppRepository, LaunchRepository, AllowanceTracker, SessionRepository, ParentalBlockedAppRepository, PreferencesManager, StrictSessionManager, ParentalControlManager, InsightsRepository, BrowserURLReader, URLClassifier, URLCaptureQueue, AutoBlacklistEngine, WebFilterConfigRepository. Uses **InterceptionPipeline** for app interception logic.
 - **PauseVpnService** — Gets **VpnEntryPoint**: BlocklistMatcher, WhitelistMatcher, WebFilterConfigRepository. BlocklistMatcher and WhitelistMatcher internally use BlacklistRepository and WhitelistRepository and cache domain sets in memory (with mutex and 60s reload).
 
 ---
