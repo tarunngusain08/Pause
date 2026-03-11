@@ -12,7 +12,7 @@ This document describes how Pause uses the Android Accessibility Service for for
   - Optionally read **URL bar text** in supported browsers when Web Filter URL capture is enabled (`TYPE_WINDOW_CONTENT_CHANGED`).
 - **What it does not do:** Read generic screen content, passwords, or messages. URL reading is limited to the address bar for classification and visit log only; enforcement is done by the VPN.
 
-The service cannot use Hilt constructor injection (it is created by the system). It uses **PauseAccessibilityEntryPoint** to obtain dependencies from the application context when `onServiceConnected()` runs.
+The service cannot use Hilt constructor injection (it is created by the system). It uses **PauseAccessibilityEntryPoint** to obtain dependencies from the application context when `onServiceConnected()` runs. Interception logic is delegated to **InterceptionPipeline**, which evaluates stages in order: Strict → Commitment → Parental → Standard (monitored apps).
 
 ---
 
@@ -25,36 +25,29 @@ Handled in `handleWindowStateChanged(event)`:
 1. **Package change**  
    - If `event.packageName` equals the last known foreground package, the event is ignored.
 
-2. **Unlock detection (lock screen intervention)**  
-   - If the new package is a launcher and the previous package was not, the app treats this as an “unlock.” It records the unlock and checks whether to show the lock intervention overlay (e.g. ≥5 unlocks in 15 minutes).
+2. **Excluded and launcher packages**  
+   - System UI, launchers, Settings, package installer, and the Pause app itself are excluded. For these, `overlayManager.dismiss()` is called and the handler returns.
 
-3. **Excluded packages**  
-   - System UI, launchers, Settings, package installer, and the Pause app itself are excluded from interception.
+3. **InterceptionPipeline.evaluate(pkg)**  
+   - The pipeline runs four stages in order; the first that handles the package returns true and stops:
+     - **Strict** — If a Strict session is active and the app is blocked, `StrictBlockOverlayView` is shown (with optional emergency exit). If the app is allowed, any block overlay is dismissed.
+     - **Commitment** — If an active commitment session blocks this package, `CommitmentBlockOverlayView` is shown. “Break commitment” leads to the 90s cooldown, then session break + streak reset.
+     - **Parental** — If the app is blocked, the parental block overlay is shown (with optional emergency contact). If the app only requires friction, the delay overlay is shown.
+     - **Standard** — If the package is in the monitored apps list: allowance exhausted → `AllowanceReachedOverlayView`; launch limit reached → `LaunchLimitOverlayView`; otherwise → reflection (when friction is MEDIUM/HIGH or a focus session is active) then delay overlay, or delay only.
+   - If no stage handles the package, `overlayManager.dismiss()` is called.
 
-4. **Strict Mode**  
-   - If a Strict session is active and the current app is blocked, `StrictBlockOverlayView` is shown (with optional emergency exit). If the app is not blocked, any existing block overlay is dismissed.
+**Unlock detection (lock screen intervention)** — Uses `ACTION_USER_PRESENT` broadcast via `userPresentReceiver` (registered in `onServiceConnected`). When the user unlocks the device, the app records the unlock and shows the lock intervention overlay if ≥5 unlocks occurred in the last 15 minutes.
 
-5. **Commitment Mode**  
-   - If an active commitment session blocks this package, `CommitmentBlockOverlayView` is shown. “Break commitment” leads to the 90s cooldown and then session break + streak reset.
-
-6. **Parental Control**  
-   - If the app is in the parental blocked list, the parental block overlay is shown (with optional emergency contact). If the app only requires friction, the delay overlay is shown.
-
-7. **Self-use monitored apps**  
-   - If the package is in the monitored apps list:
-     - **Allowance exhausted** → `AllowanceReachedOverlayView` (with “Open anyway”).
-     - **Launch limit reached** → `LaunchLimitOverlayView` (with “Open anyway”).
-     - Otherwise → reflection (if Phase 2 or friction forces it) then delay overlay, or delay only.
-
-All overlay calls are done via **OverlayManager**, which is obtained from the entry point. Coroutines are launched on a `serviceScope` (Main + SupervisorJob) so that repository and preference reads are async-safe.
+All overlay calls are done via **OverlayManager**. Coroutines are launched on a `serviceScope` (Main + SupervisorJob) so that repository and preference reads are async-safe.
 
 ### 2.2 TYPE_WINDOW_CONTENT_CHANGED (Web Filter URL capture)
 
 Handled in `handleWindowContentChanged(event)`:
 
-- **Only for known browsers** — The entry point’s `BrowserURLReader.isKnownBrowser(packageName)` must be true (e.g. Chrome, Firefox, Brave).
-- **URL bar text** — `BrowserURLReader.extractURL(rootInActiveWindow, packageName)` returns the current URL string from the accessibility tree.
-- **When Web Filter URL capture is enabled** — The URL is normalized, classified (e.g. CLEAN, KEYWORD_MATCH, BLACKLISTED) via `URLClassifier`, and then passed to `URLCaptureQueue.enqueue(...)` for logging and optional auto-blacklist. Enforcement of blocked domains remains the responsibility of the VPN.
+- **Only for known browsers** — `BrowserURLReader.isKnownBrowser(packageName)` must be true (e.g. Chrome, Firefox, Brave, Samsung Internet, Edge, DuckDuckGo, Opera, Firefox Focus).
+- **Debounce** — Per-package debounce of 500ms (`CONTENT_CHANGED_DEBOUNCE_MS`) to avoid excessive URL extraction.
+- **URL bar text** — `BrowserURLReader.extractURL(rootInActiveWindow, packageName)` returns the current URL string from the accessibility tree (view ID or EditText fallback).
+- **When Web Filter URL capture is enabled** — The URL is normalized, domain extracted, and classified via `URLClassifier.classify()` (CLEAN, KEYWORD_MATCH, BLACKLISTED, WHITELISTED). The result is passed to `URLCaptureQueue.enqueue(...)` for logging. If classification is `KEYWORD_MATCH`, `AutoBlacklistEngine.onKeywordMatch()` is called to add the domain to the blacklist (when `autoBlacklistOnKeywordMatch` is enabled) and create a `PendingReview`. Enforcement of blocked domains remains the responsibility of the VPN.
 
 Details of URL classification and VPN enforcement are in [webfilter.md](webfilter.md).
 
@@ -70,23 +63,26 @@ Details of URL classification and VPN enforcement are in [webfilter.md](webfilte
 
 ## 4. Overlay Types and State
 
-`OverlayState` is an enum used to track what is currently shown. Examples:
+`OverlayState` is an enum with a `priority` value used to track what is currently shown:
 
-| State | View / Behavior |
-|-------|------------------|
-| `IDLE` | No overlay |
-| `SHOWING_REFLECTION` | ReflectionOverlayView — “Why are you opening &lt;app&gt;?” with reason buttons |
-| `SHOWING_DELAY` | DelayOverlayView — countdown, Cancel / wait |
-| `SHOWING_COMMITMENT_BLOCK` | CommitmentBlockOverlayView — “Break commitment” → cooldown |
-| `SHOWING_STRICT_BLOCK` | StrictBlockOverlayView — app blocked for strict session; optional emergency exit |
-| `SHOWING_ALLOWANCE_REACHED` | AllowanceReachedOverlayView — daily allowance used; “Open anyway” / “I’m done” |
-| `SHOWING_LAUNCH_LIMIT` | LaunchLimitOverlayView — per-app limit reached; “Open anyway” / skip |
-| `SHOWING_COOLDOWN` | CooldownOverlayView — 90s cooldown for commitment break |
-| `SHOWING_LOCK_INTERVENTION` | LockInterventionOverlayView — “You’ve unlocked X times…” |
-| `SHOWING_PARENTAL_BLOCK` | ParentalBlockOverlayView — app blocked by parent; optional emergency contact |
-| `SHOWING_POWER_BLOCK` | PowerMenuBlockOverlayView — power menu blocked during strict/parental |
-| `SHOWING_PIN_ENTRY` | PINEntryOverlayView — parent PIN to access dashboard |
-| … | Session complete, session resume, schedule resume, emergency confirm, etc. |
+| State | Priority | View / Behavior |
+|-------|----------|------------------|
+| `IDLE` | 0 | No overlay |
+| `SHOWING_SCHEDULE_RESUME` | 10 | Schedule band change notification |
+| `SHOWING_SESSION_RESUME` | 10 | Session resume notification |
+| `SHOWING_SESSION_COMPLETE` | 10 | Session complete notification |
+| `SHOWING_LOCK_INTERVENTION` | 10 | LockInterventionOverlayView — “You’ve unlocked X times…” |
+| `SHOWING_REFLECTION` | 30 | ReflectionOverlayView — “Why are you opening &lt;app&gt;?” with reason buttons |
+| `SHOWING_DELAY` | 40 | DelayOverlayView — countdown, Cancel / wait |
+| `SHOWING_COOLDOWN` | 70 | CooldownOverlayView — 90s cooldown for commitment break |
+| `SHOWING_LAUNCH_LIMIT` | 75 | LaunchLimitOverlayView — per-app limit reached; “Open anyway” / skip |
+| `SHOWING_ALLOWANCE_REACHED` | 80 | AllowanceReachedOverlayView — daily allowance used; “Open anyway” / “I’m done” |
+| `SHOWING_COMMITMENT_BLOCK` | 80 | CommitmentBlockOverlayView — “Break commitment” → cooldown |
+| `SHOWING_PARENTAL_BLOCK` | 90 | ParentalBlockOverlayView — app blocked by parent; optional emergency contact |
+| `SHOWING_POWER_BLOCK` | 90 | PowerMenuBlockOverlayView — power menu blocked during strict/parental |
+| `SHOWING_PIN_ENTRY` | 95 | PINEntryOverlayView — parent PIN to access dashboard |
+| `SHOWING_EMERGENCY_CONFIRM` | 95 | EmergencyConfirmOverlayView — confirm emergency exit |
+| `SHOWING_STRICT_BLOCK` | 100 | StrictBlockOverlayView — app blocked for strict session; optional emergency exit |
 
 ---
 
@@ -112,7 +108,7 @@ Details of URL classification and VPN enforcement are in [webfilter.md](webfilte
 ## 8. Implementation Notes
 
 - **Threading** — Overlay views must be attached/detached on the main thread. The Accessibility Service uses `serviceScope` with `Dispatchers.Main` for calls that lead to overlay show/dismiss.
-- **Re-checking package** — Before showing an overlay, the code often checks `currentForegroundPackage != packageName` and returns early to avoid showing stale overlays if the user switched apps quickly.
+- **Re-checking package** — `InterceptionPipeline` receives an `isForeground` lambda that checks `currentForegroundPackage == pkg`. Before showing an overlay, stages call `isForeground(pkg)` and return early if the user switched apps.
 - **Overlay permission** — Before adding overlays, the code checks `Settings.canDrawOverlays(context)` (API 23+). If permission is missing, overlay show is skipped and a log is written.
 
 For Web Filter URL capture flow and VPN, see [webfilter.md](webfilter.md). For product flows and states, see [Design.md](Design.md).
