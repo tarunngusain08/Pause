@@ -72,6 +72,8 @@ fun HomeScreen(
     val streak by viewModel.streak.collectAsState(initial = null)
     val costOfScrollMinutes by viewModel.costOfScrollMinutes.collectAsState(initial = null)
     val strictSession by viewModel.strictSession.collectAsState(initial = null)
+    val focusSession by viewModel.focusSession.collectAsStateWithLifecycle()
+    val commitmentSession by viewModel.commitmentSession.collectAsStateWithLifecycle()
     val parentalActive by viewModel.parentalActive.collectAsState(initial = false)
     val remainingAllowance by viewModel.remainingAllowanceMinutes.collectAsState(initial = null)
     val unlocksToday by viewModel.unlocksToday.collectAsState(initial = 0)
@@ -80,6 +82,8 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var strictRemainingMs by remember { mutableStateOf(0L) }
+    var focusRemainingMs by remember { mutableStateOf(0L) }
+    var commitmentRemainingMs by remember { mutableStateOf(0L) }
     // Tracks whether the user explicitly dismissed the permission dialog this session.
     // rememberSaveable survives configuration changes (rotation) so the dialog doesn't reappear.
     var permissionDialogDismissed by rememberSaveable { mutableStateOf(false) }
@@ -91,6 +95,22 @@ fun HomeScreen(
                 strictRemainingMs = viewModel.getStrictRemainingMs()
                 delay(1000)
             }
+        }
+    }
+
+    LaunchedEffect(focusSession) {
+        while (focusSession != null) {
+            val s = focusSession ?: break
+            focusRemainingMs = (s.endsAt - System.currentTimeMillis()).coerceAtLeast(0)
+            delay(1000)
+        }
+    }
+
+    LaunchedEffect(commitmentSession) {
+        while (commitmentSession != null) {
+            val s = commitmentSession ?: break
+            commitmentRemainingMs = (s.endsAt - System.currentTimeMillis()).coerceAtLeast(0)
+            delay(1000)
         }
     }
 
@@ -172,6 +192,60 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Focus Mode active card
+        focusSession?.let {
+            val minutes = (focusRemainingMs / 1000 / 60).toInt()
+            val seconds = ((focusRemainingMs / 1000) % 60).toInt()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Focus Mode active",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = String.format("%d:%02d remaining", minutes, seconds),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Commitment Mode active card
+        commitmentSession?.let {
+            val minutes = (commitmentRemainingMs / 1000 / 60).toInt()
+            val seconds = ((commitmentRemainingMs / 1000) % 60).toInt()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Commitment Mode active",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = String.format("%d:%02d remaining", minutes, seconds),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         // Cost of a Scroll card (Phase 2+)
         costOfScrollMinutes?.let { minutes ->
             Card(
@@ -233,26 +307,62 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Streak card (Phase 2+)
+        // Streak card
         streak?.let { s ->
+            val todayMidnight = com.pause.app.util.DateUtils.getTodayMidnight()
+            val streakAtRisk = s.currentStreakDays > 0 && s.lastValidDay < todayMidnight
+            val milestones = listOf(7, 14, 30, 60, 100)
+            val nextMilestone = milestones.firstOrNull { it > s.currentStreakDays }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    containerColor = if (streakAtRisk)
+                        MaterialTheme.colorScheme.errorContainer
+                    else
+                        MaterialTheme.colorScheme.tertiaryContainer
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Streak",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (streakAtRisk) "\uD83D\uDD25 Streak at risk!" else "\uD83D\uDD25 Streak",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (streakAtRisk)
+                                MaterialTheme.colorScheme.onErrorContainer
+                            else
+                                MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${s.currentStreakDays} days",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = if (streakAtRisk)
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else
+                            MaterialTheme.colorScheme.onTertiaryContainer
                     )
+                    if (streakAtRisk) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Use Pause today to keep your streak alive!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                    nextMilestone?.let { milestone ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${milestone - s.currentStreakDays} days to $milestone-day milestone",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (streakAtRisk)
+                                MaterialTheme.colorScheme.onErrorContainer
+                            else
+                                MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -386,20 +496,21 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        OutlinedButton(
-            onClick = onNavigateToFocus,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Lock,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Focus Mode")
+        if (focusSession == null) {
+            OutlinedButton(
+                onClick = onNavigateToFocus,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Focus Mode")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedButton(
             onClick = onNavigateToInsights,
@@ -410,11 +521,14 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        OutlinedButton(
-            onClick = onNavigateToCommitment,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Commitment Mode")
+        if (commitmentSession == null) {
+            OutlinedButton(
+                onClick = onNavigateToCommitment,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Commitment Mode")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
