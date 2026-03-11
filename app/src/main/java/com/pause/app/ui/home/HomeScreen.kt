@@ -4,7 +4,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Accessibility
@@ -46,6 +47,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -59,12 +62,10 @@ import kotlinx.coroutines.delay
 fun HomeScreen(
     onNavigateToAppSelection: () -> Unit,
     onNavigateToStrictSetup: () -> Unit = {},
-    onNavigateToParentalSetup: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToFocus: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
-    onNavigateToCommitment: () -> Unit = {},
-    onNavigateToChildStatus: () -> Unit = {},
+    onNavigateToContentShield: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val monitoredApps by viewModel.monitoredApps.collectAsState(initial = emptyList())
@@ -73,8 +74,7 @@ fun HomeScreen(
     val costOfScrollMinutes by viewModel.costOfScrollMinutes.collectAsState(initial = null)
     val strictSession by viewModel.strictSession.collectAsState(initial = null)
     val focusSession by viewModel.focusSession.collectAsStateWithLifecycle()
-    val commitmentSession by viewModel.commitmentSession.collectAsStateWithLifecycle()
-    val parentalActive by viewModel.parentalActive.collectAsState(initial = false)
+    val streakExpiresInMs by viewModel.streakExpiresInMs.collectAsStateWithLifecycle()
     val remainingAllowance by viewModel.remainingAllowanceMinutes.collectAsState(initial = null)
     val unlocksToday by viewModel.unlocksToday.collectAsState(initial = 0)
     val permissionStatus by viewModel.permissionStatus.collectAsStateWithLifecycle()
@@ -83,7 +83,6 @@ fun HomeScreen(
 
     var strictRemainingMs by remember { mutableStateOf(0L) }
     var focusRemainingMs by remember { mutableStateOf(0L) }
-    var commitmentRemainingMs by remember { mutableStateOf(0L) }
     // Tracks whether the user explicitly dismissed the permission dialog this session.
     // rememberSaveable survives configuration changes (rotation) so the dialog doesn't reappear.
     var permissionDialogDismissed by rememberSaveable { mutableStateOf(false) }
@@ -313,6 +312,14 @@ fun HomeScreen(
             val streakAtRisk = s.currentStreakDays > 0 && s.lastValidDay < todayMidnight
             val milestones = listOf(7, 14, 30, 60, 100)
             val nextMilestone = milestones.firstOrNull { it > s.currentStreakDays }
+            val contentColor = if (streakAtRisk)
+                MaterialTheme.colorScheme.onErrorContainer
+            else
+                MaterialTheme.colorScheme.onTertiaryContainer
+            val arcColor = if (streakAtRisk)
+                MaterialTheme.colorScheme.error
+            else
+                MaterialTheme.colorScheme.tertiary
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -322,46 +329,79 @@ fun HomeScreen(
                         MaterialTheme.colorScheme.tertiaryContainer
                 )
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Circular progress arc around the streak count
+                    val sweepAngle = if (nextMilestone != null && nextMilestone > 0) {
+                        (s.currentStreakDays.toFloat() / nextMilestone.toFloat()) * 360f
+                    } else 360f
+                    Box(
+                        modifier = Modifier.size(72.dp),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Canvas(modifier = Modifier.size(72.dp)) {
+                            drawArc(
+                                color = arcColor.copy(alpha = 0.2f),
+                                startAngle = -90f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                            drawArc(
+                                color = arcColor,
+                                startAngle = -90f,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
                         Text(
-                            text = if (streakAtRisk) "\uD83D\uDD25 Streak at risk!" else "\uD83D\uDD25 Streak",
+                            text = "\uD83D\uDD25",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (streakAtRisk) "Streak at risk!" else "Streak",
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (streakAtRisk)
-                                MaterialTheme.colorScheme.onErrorContainer
-                            else
-                                MaterialTheme.colorScheme.onTertiaryContainer
+                            color = contentColor
                         )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${s.currentStreakDays} days",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = if (streakAtRisk)
-                            MaterialTheme.colorScheme.onErrorContainer
-                        else
-                            MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                    if (streakAtRisk) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Use Pause today to keep your streak alive!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            text = "${s.currentStreakDays} days",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = contentColor
                         )
-                    }
-                    nextMilestone?.let { milestone ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${milestone - s.currentStreakDays} days to $milestone-day milestone",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (streakAtRisk)
-                                MaterialTheme.colorScheme.onErrorContainer
-                            else
-                                MaterialTheme.colorScheme.onTertiaryContainer
-                        )
+                        if (streakAtRisk) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val expiresMs = streakExpiresInMs
+                            if (expiresMs != null) {
+                                val hoursLeft = (expiresMs / 3_600_000).toInt()
+                                val minsLeft = ((expiresMs % 3_600_000) / 60_000).toInt()
+                                Text(
+                                    text = "Expires in ${hoursLeft}h ${minsLeft}m",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = contentColor
+                                )
+                            } else {
+                                Text(
+                                    text = "Use Pause today to keep your streak alive!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = contentColor
+                                )
+                            }
+                        }
+                        nextMilestone?.let { milestone ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${milestone - s.currentStreakDays} days to $milestone-day milestone",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = contentColor
+                            )
+                        }
                     }
                 }
             }
@@ -534,26 +574,10 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedButton(
-            onClick = onNavigateToParentalSetup,
+            onClick = onNavigateToContentShield,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(
-                imageVector = Icons.Filled.FamilyRestroom,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Parental Control")
-        }
-
-        if (parentalActive) {
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onNavigateToChildStatus,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("View Child Status")
-            }
+            Text("Content Shield")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
