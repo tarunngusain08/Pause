@@ -36,7 +36,7 @@ Handled in `handleWindowStateChanged(event)`:
      - **Standard** — If the package is in the monitored apps list: allowance exhausted → `AllowanceReachedOverlayView`; launch limit reached → `LaunchLimitOverlayView`; otherwise → reflection (when friction is MEDIUM/HIGH or a focus session is active) then delay overlay, or delay only.
    - If no stage handles the package, `overlayManager.dismiss()` is called.
 
-**Unlock detection (lock screen intervention)** — Uses `ACTION_USER_PRESENT` broadcast via `userPresentReceiver` (registered in `onServiceConnected`). When the user unlocks the device, the app records the unlock and shows the lock intervention overlay if ≥5 unlocks occurred in the last 15 minutes.
+**Unlock detection (lock screen intervention)** — Uses `ACTION_USER_PRESENT` broadcast via `userPresentReceiver` (registered in `onServiceConnected`). When the user unlocks the device, the app records the unlock. If ≥5 unlocks occurred in the last 15 minutes, it shows the lock intervention overlay. Otherwise, it shows **GentleReentryOverlayView** — a brief “Pause. Breathe.” overlay for low unlock counts.
 
 All overlay calls are done via **OverlayManager**. Coroutines are launched on a `serviceScope` (Main + SupervisorJob) so that repository and preference reads are async-safe.
 
@@ -63,21 +63,22 @@ Details of URL classification and VPN enforcement are in [webfilter.md](webfilte
 
 ## 4. Overlay Types and State
 
-`OverlayState` is an enum with a `priority` value used to track what is currently shown:
+`OverlayState` is an enum with `priority` and optional `isInformational` (informational overlays are lower priority and may be dismissed differently):
 
 | State | Priority | View / Behavior |
 |-------|----------|------------------|
 | `IDLE` | 0 | No overlay |
+| `SHOWING_GENTLE_REENTRY` | 5 | GentleReentryOverlayView — brief “Pause. Breathe.” on unlock when count &lt; 5 |
 | `SHOWING_SCHEDULE_RESUME` | 10 | Schedule band change notification |
 | `SHOWING_SESSION_RESUME` | 10 | Session resume notification |
 | `SHOWING_SESSION_COMPLETE` | 10 | Session complete notification |
-| `SHOWING_LOCK_INTERVENTION` | 10 | LockInterventionOverlayView — “You’ve unlocked X times…” |
+| `SHOWING_LOCK_INTERVENTION` | 20 | LockInterventionOverlayView — “You’ve unlocked X times…” |
 | `SHOWING_REFLECTION` | 30 | ReflectionOverlayView — “Why are you opening &lt;app&gt;?” with reason buttons |
 | `SHOWING_DELAY` | 40 | DelayOverlayView — countdown, Cancel / wait |
+| `SHOWING_ALLOWANCE_REACHED` | 60 | AllowanceReachedOverlayView — daily allowance used; “Open anyway” / “I’m done” |
+| `SHOWING_LAUNCH_LIMIT` | 65 | LaunchLimitOverlayView — per-app limit reached; “Open anyway” / skip |
 | `SHOWING_COOLDOWN` | 70 | CooldownOverlayView — 90s cooldown for commitment break |
-| `SHOWING_LAUNCH_LIMIT` | 75 | LaunchLimitOverlayView — per-app limit reached; “Open anyway” / skip |
-| `SHOWING_ALLOWANCE_REACHED` | 80 | AllowanceReachedOverlayView — daily allowance used; “Open anyway” / “I’m done” |
-| `SHOWING_COMMITMENT_BLOCK` | 80 | CommitmentBlockOverlayView — “Break commitment” → cooldown |
+| `SHOWING_COMMITMENT_BLOCK` | 85 | CommitmentBlockOverlayView — “Break commitment” → cooldown |
 | `SHOWING_PARENTAL_BLOCK` | 90 | ParentalBlockOverlayView — app blocked by parent; optional emergency contact |
 | `SHOWING_POWER_BLOCK` | 90 | PowerMenuBlockOverlayView — power menu blocked during strict/parental |
 | `SHOWING_PIN_ENTRY` | 95 | PINEntryOverlayView — parent PIN to access dashboard |
@@ -99,16 +100,16 @@ Details of URL classification and VPN enforcement are in [webfilter.md](webfilte
 
 ---
 
-## 7. Power Key and Strict / Parental
+## 7. Power Key, Recents, and Strict / Parental
 
-- **onKeyEvent** — If the key is power long-press and either a Strict session is active or Parental Control is active, the service shows `PowerMenuBlockOverlayView` (or similar) to discourage turning off the device to bypass. The event is consumed (`return true`) in that case.
+- **onKeyEvent** — **Recents (APP_SWITCH):** When `SHOWING_STRICT_BLOCK` or `SHOWING_PARENTAL_BLOCK` is active, the service consumes the recents key and calls `performGlobalAction(GLOBAL_ACTION_HOME)` to prevent switching away from the block overlay. **Power long-press:** If a Strict session is active or Parental Control is active, the service shows `PowerMenuBlockOverlayView` to discourage turning off the device. The event is consumed (`return true`) in those cases.
 
 ---
 
 ## 8. Implementation Notes
 
 - **Threading** — Overlay views must be attached/detached on the main thread. The Accessibility Service uses `serviceScope` with `Dispatchers.Main` for calls that lead to overlay show/dismiss.
-- **Re-checking package** — `InterceptionPipeline` receives an `isForeground` lambda that checks `currentForegroundPackage == pkg`. Before showing an overlay, stages call `isForeground(pkg)` and return early if the user switched apps.
+- **Re-checking package** — `InterceptionPipeline` receives an `isForeground` lambda that checks `_foregroundPackage.value == pkg` (the service uses `MutableStateFlow<String?>` for the current foreground package). Before showing an overlay, stages call `isForeground(pkg)` and return early if the user switched apps.
 - **Overlay permission** — Before adding overlays, the code checks `Settings.canDrawOverlays(context)` (API 23+). If permission is missing, overlay show is skipped and a log is written.
 
 For Web Filter URL capture flow and VPN, see [webfilter.md](webfilter.md). For product flows and states, see [Design.md](Design.md).
