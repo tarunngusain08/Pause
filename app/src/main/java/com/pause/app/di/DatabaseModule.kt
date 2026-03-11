@@ -43,7 +43,7 @@ object DatabaseModule {
             context
         }
         return Room.databaseBuilder(dbContext, PauseDatabase::class.java, "pause_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 
@@ -159,6 +159,16 @@ object DatabaseModule {
             // pending_review: indices on status and flagged_at
             db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_review_status ON pending_review(status)")
             db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_review_flagged_at ON pending_review(flagged_at)")
+        }
+    }
+
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Add composite index on launch_events(package_name, launched_at)
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_launch_events_package_name_launched_at " +
+                    "ON launch_events(package_name, launched_at)"
+            )
         }
     }
 
