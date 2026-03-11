@@ -12,17 +12,19 @@ import com.pause.app.data.preferences.PreferencesManager
 import com.pause.app.data.repository.SessionRepository
 import com.pause.app.data.repository.StreakRepository
 import com.pause.app.service.AllowanceTracker
-import com.pause.app.service.parental.ParentalControlManager
 import com.pause.app.service.strict.StrictSessionManager
+import com.pause.app.util.DateUtils
 import com.pause.app.util.PermissionHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -43,8 +45,7 @@ class HomeViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val preferencesManager: PreferencesManager,
     private val allowanceTracker: AllowanceTracker,
-    private val insightsRepository: InsightsRepository,
-    private val parentalControlManager: ParentalControlManager
+    private val insightsRepository: InsightsRepository
 ) : ViewModel() {
 
     val monitoredApps: StateFlow<List<MonitoredApp>> =
@@ -69,8 +70,8 @@ class HomeViewModel @Inject constructor(
     val streak = streakRepository.getStreakFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val parentalActive = parentalControlManager.isActive
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    private val _streakExpiresInMs = MutableStateFlow<Long?>(null)
+    val streakExpiresInMs: StateFlow<Long?> = _streakExpiresInMs.asStateFlow()
 
     private val _remainingAllowanceMinutes = MutableStateFlow<Int?>(null)
     val remainingAllowanceMinutes: StateFlow<Int?> = _remainingAllowanceMinutes.asStateFlow()
@@ -82,6 +83,20 @@ class HomeViewModel @Inject constructor(
     val costOfScrollMinutes: StateFlow<Int?> = _costOfScrollMinutes.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            // Live countdown for streak at-risk (updates every minute)
+            while (isActive) {
+                val s = streak.value
+                val todayMidnight = DateUtils.getTodayMidnight()
+                if (s != null && s.currentStreakDays > 0 && s.lastValidDay < todayMidnight) {
+                    val nextMidnight = todayMidnight + 24 * 60 * 60 * 1000L
+                    _streakExpiresInMs.value = (nextMidnight - System.currentTimeMillis()).coerceAtLeast(0)
+                } else {
+                    _streakExpiresInMs.value = null
+                }
+                delay(60_000)
+            }
+        }
         viewModelScope.launch {
             val lastShown = preferencesManager.lastCostOfScrollShownDate.first()
             val todayMidnight = com.pause.app.util.DateUtils.getTodayMidnight()
