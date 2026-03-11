@@ -20,15 +20,11 @@ import androidx.navigation.navDeepLink
 import com.pause.app.ui.appselection.AppSelectionScreen
 import com.pause.app.ui.home.HomeScreen
 import com.pause.app.ui.onboarding.OnboardingScreen
-import com.pause.app.ui.commitment.CommitmentModeScreen
 import com.pause.app.ui.focus.FocusModeScreen
 import com.pause.app.ui.insights.WeeklyInsightsScreen
 import com.pause.app.ui.settings.SettingsScreen
 import com.pause.app.ui.onboarding.OnboardingViewModel
 import com.pause.app.ui.strict.StrictModeSetupScreen
-import com.pause.app.ui.parental.ParentalSetupScreen
-import com.pause.app.ui.parental.ParentDashboardScreen
-import com.pause.app.ui.parental.ChildStatusScreen
 import com.pause.app.ui.webfilter.DomainBlacklistScreen
 import com.pause.app.ui.webfilter.KeywordManagerScreen
 import com.pause.app.ui.webfilter.UnblockRequestScreen
@@ -73,22 +69,10 @@ fun PauseNavGraph() {
             HomeScreen(
                 onNavigateToAppSelection = { navController.navigate(Routes.APP_SELECTION) },
                 onNavigateToStrictSetup = { navController.navigate(Routes.STRICT_SETUP) },
-                onNavigateToParentalSetup = { navController.navigate(Routes.PARENTAL_SETUP) },
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToFocus = { navController.navigate(Routes.FOCUS) },
                 onNavigateToInsights = { navController.navigate(Routes.WEEKLY_INSIGHTS) },
-                onNavigateToCommitment = { navController.navigate(Routes.COMMITMENT_SETUP) },
-                onNavigateToChildStatus = { navController.navigate(Routes.CHILD_STATUS) }
-            )
-        }
-        composable(Routes.COMMITMENT_SETUP) {
-            CommitmentModeScreen(
-                onSessionStarted = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.COMMITMENT_SETUP) { inclusive = true }
-                    }
-                },
-                onBack = { navController.popBackStack() }
+                onNavigateToContentShield = { navController.navigate(Routes.CONTENT_SHIELD) }
             )
         }
         composable(Routes.WEEKLY_INSIGHTS) {
@@ -122,24 +106,14 @@ fun PauseNavGraph() {
                 onDone = { navController.popBackStack() }
             )
         }
-        composable(Routes.PARENTAL_SETUP) {
-            ParentalSetupScreen(
-                onComplete = {
-                    navController.navigate(Routes.PARENT_DASHBOARD) {
-                        popUpTo(Routes.PARENTAL_SETUP) { inclusive = true }
-                    }
-                },
+        composable(Routes.CONTENT_SHIELD) {
+            WebFilterDashboardScreen(
+                onNavigateToBlacklist = { navController.navigate(Routes.DOMAIN_BLACKLIST) },
+                onNavigateToKeywords = { navController.navigate(Routes.KEYWORD_MANAGER) },
+                onNavigateToUrlLog = { navController.navigate(Routes.URL_VISIT_LOG) },
+                onNavigateToWhitelist = { navController.navigate(Routes.WHITELIST) },
                 onBack = { navController.popBackStack() }
             )
-        }
-        composable(Routes.PARENT_DASHBOARD) {
-            ParentDashboardScreen(
-                onBack = { navController.popBackStack() },
-                onNavigateToWebFilter = { navController.navigate(Routes.WEB_FILTER_DASHBOARD) }
-            )
-        }
-        composable(Routes.CHILD_STATUS) {
-            ChildStatusScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.WEB_FILTER_DASHBOARD) {
             WebFilterDashboardScreen(
