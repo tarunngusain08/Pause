@@ -75,22 +75,21 @@ Repositories are provided by Hilt and used by ViewModels and services (via entry
 
 ## 4. Preferences and Feature Flags
 
-- **PreferencesManager** (DataStore or SharedPreferences) — Delay duration, Phase 2 enabled, overlay and usage preferences. Not in Room; provided separately (e.g. AppModule).
-- **FeatureFlags** — Exposes `isPhase2Enabled` Flow; used by Accessibility Service to decide reflection vs delay-only.
+- **PreferencesManager** — Uses **DataStore** (`pause_preferences`). Holds: `delayDurationSeconds`, `onboardingComplete`, `currentPhase`, `dailyAllowanceMinutes`, `lastCostOfScrollShownDate`, `showReEntryPrompt`, parental setup step, PIN hash, recovery phrase hash, PIN attempt/lockout. Provided via Hilt.
+- **FeatureFlags** — Wraps `PreferencesManager.currentPhase`; exposes `isPhase2Enabled`, `isPhase3Enabled` as Flow. Phase is used for feature gating (e.g. allowance, launch limits); reflection in the interception pipeline is driven by friction level (MEDIUM/HIGH) and focus session, not the phase flag.
 
 ---
 
 ## 5. Usage from Services
 
-- **PauseAccessibilityService** — Gets repositories and managers via **PauseAccessibilityEntryPoint**: AppRepository, LaunchRepository, SessionRepository, AllowanceTracker, PreferencesManager, FeatureFlags, StrictSessionManager, ParentalControlManager, ParentalBlockedAppRepository, WebFilterConfigRepository, BrowserURLReader, URLClassifier, URLCaptureQueue, InsightsRepository.
-- **PauseVpnService** — Gets **VpnEntryPoint**: BlocklistMatcher, WhitelistMatcher, WebFilterConfigRepository. BlocklistMatcher and WhitelistMatcher internally use BlacklistRepository and WhitelistRepository and cache domain sets in memory.
+- **PauseAccessibilityService** — Gets dependencies via **PauseAccessibilityEntryPoint**: OverlayManager, AppRepository, LaunchRepository, SessionRepository, AllowanceTracker, PreferencesManager, FeatureFlags, StrictSessionManager, ParentalControlManager, ParentalBlockedAppRepository, WebFilterConfigRepository, BrowserURLReader, URLClassifier, URLCaptureQueue, AutoBlacklistEngine, InsightsRepository. Uses **InterceptionPipeline** for app interception logic.
+- **PauseVpnService** — Gets **VpnEntryPoint**: BlocklistMatcher, WhitelistMatcher, WebFilterConfigRepository. BlocklistMatcher and WhitelistMatcher internally use BlacklistRepository and WhitelistRepository and cache domain sets in memory (with mutex and 60s reload).
 
 ---
 
 ## 6. Workers
 
-- **MidnightResetWorker** — Scheduled at midnight; resets daily counters and evaluates streak (reads LaunchEventDao / SessionDao / StreakDao via constructor-injected repositories). Uses Hilt’s `HiltWorkerFactory`.
-- **AccountabilityDispatchWorker** (if present) — Builds daily summary from InsightsRepository and AccountabilityRepository and triggers SMS intent.
+- **MidnightResetWorker** — Scheduled as unique periodic work (24h, first run at next midnight). In `doWork()`: deletes launch events, reflection responses, unlock events, and sessions older than 90 days; deletes URL visit log and pending reviews older than 30/90 days; calls `evaluateStreak()` which checks yesterday’s launch counts against per-app limits, uses shields or resets streak accordingly. Uses Hilt’s `HiltWorkerFactory`; injects LaunchRepository, InsightsRepository, SessionRepository, UrlVisitLogRepository, PendingReviewDao, AppRepository, StreakRepository.
 
 ---
 
