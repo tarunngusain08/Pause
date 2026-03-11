@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.pause.app.BuildConfig
 
 @Composable
 fun SettingsScreen(
@@ -115,7 +116,7 @@ fun SettingsScreen(
             }
         }
 
-        if (com.pause.app.BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
