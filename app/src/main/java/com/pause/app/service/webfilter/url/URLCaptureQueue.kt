@@ -47,7 +47,7 @@ class URLCaptureQueue @Inject constructor(
                 recentDomains[key] = now
                 pending.add(
                     UrlVisitLog(
-                        fullUrl = url.take(500),
+                        fullUrl = url.take(2000),
                         domain = domain,
                         browserPackage = browserPackage,
                         visitedAt = now,
