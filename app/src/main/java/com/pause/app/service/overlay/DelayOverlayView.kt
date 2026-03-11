@@ -8,7 +8,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import com.pause.app.R
 
-class DelayOverlayView(context: Context) : FrameLayout(context) {
+class DelayOverlayView(context: Context) : FrameLayout(context), TimerCancellable {
 
     private val appNameLabel: TextView
     private val countdownText: TextView
@@ -61,8 +61,13 @@ class DelayOverlayView(context: Context) : FrameLayout(context) {
         onCompleteListener = listener
     }
 
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
+    override fun cancelTimers() {
+        isDismissed = true
         countDownTimer?.cancel()
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelTimers()
+        super.onDetachedFromWindow()
     }
 }
