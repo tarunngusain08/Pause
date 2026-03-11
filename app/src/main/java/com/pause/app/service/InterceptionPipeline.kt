@@ -50,7 +50,7 @@ class InterceptionPipeline(
             // Active strict session but this app is allowed — clear any lingering block.
             overlayManager.dismiss()
             false
-        }.also { _ -> session } // reference session to avoid lint warning
+        }
     }
 
     // ── Stage 2: Commitment session ───────────────────────────────────────────
@@ -60,7 +60,6 @@ class InterceptionPipeline(
         val commitmentSession = sessionRepository.getActiveCommitmentSession() ?: return false
         if (!sessionRepository.isPackageInCommitmentBlockList(commitmentSession, pkg)) return false
 
-        val appName = resolveAppName(pkg)
         if (!isForeground(pkg)) return true
         overlayManager.showCommitmentBlockOverlay {
             serviceScope.launch {
