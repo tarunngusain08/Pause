@@ -14,7 +14,7 @@ class ReflectionOverlayView(
     context: Context,
     private val appName: String,
     private val onReasonSelected: (String) -> Unit
-) : FrameLayout(context) {
+) : FrameLayout(context), TimerCancellable {
 
     private lateinit var appNameText: TextView
     private lateinit var btnBored: Button
@@ -63,9 +63,13 @@ class ReflectionOverlayView(
         timeoutTimer.start()
     }
 
-    override fun onDetachedFromWindow() {
+    override fun cancelTimers() {
         isDismissed = true
         timeoutTimer.cancel()
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelTimers()
         super.onDetachedFromWindow()
     }
 
