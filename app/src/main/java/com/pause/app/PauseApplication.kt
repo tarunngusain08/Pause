@@ -8,6 +8,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.pause.app.data.AssetImporter
 import com.pause.app.data.repository.WebFilterConfigRepository
+import com.pause.app.worker.HealthCheckWorker
 import com.pause.app.worker.MidnightResetWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ class PauseApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         scheduleMidnightResetWorker()
+        scheduleHealthCheckWorker()
         appScope.launch {
             assetImporter.importBundledAssetsIfNeeded()
             if (webFilterConfigRepository.getConfig() == null) {
@@ -60,6 +62,17 @@ class PauseApplication : Application(), Configuration.Provider {
             MidnightResetWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             midnightWork
+        )
+    }
+
+    private fun scheduleHealthCheckWorker() {
+        val healthWork = PeriodicWorkRequestBuilder<HealthCheckWorker>(
+            6, TimeUnit.HOURS
+        ).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            HealthCheckWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            healthWork
         )
     }
 
