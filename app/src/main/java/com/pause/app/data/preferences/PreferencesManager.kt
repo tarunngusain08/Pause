@@ -76,6 +76,18 @@ class PreferencesManager @Inject constructor(
         dataStore.edit { it[KEY_DAILY_ALLOWANCE_MINUTES] = minutes }
     }
 
+    val parentalSetupStep: Flow<Int> = dataStore.data.map { prefs ->
+        prefs[KEY_PARENTAL_SETUP_STEP] ?: 0
+    }
+
+    suspend fun setParentalSetupStep(step: Int) {
+        dataStore.edit { it[KEY_PARENTAL_SETUP_STEP] = step }
+    }
+
+    suspend fun clearParentalSetupStep() {
+        dataStore.edit { it.remove(KEY_PARENTAL_SETUP_STEP) }
+    }
+
     // anyStrictActive and parentalActive are managed by SessionPreferences (device-protected
     // SharedPreferences). Do not add duplicate keys here to avoid two sources of truth.
 
@@ -124,6 +136,7 @@ class PreferencesManager @Inject constructor(
         private val KEY_RECOVERY_PHRASE_HASH = stringPreferencesKey("recovery_phrase_hash")
         private val KEY_PIN_ATTEMPT_COUNT = intPreferencesKey("pin_attempt_count")
         private val KEY_PIN_LOCKOUT_UNTIL = longPreferencesKey("pin_lockout_until")
+        private val KEY_PARENTAL_SETUP_STEP = intPreferencesKey("parental_setup_step")
 
         const val DEFAULT_DELAY_SECONDS = 10
         const val DEFAULT_PHASE = 2
