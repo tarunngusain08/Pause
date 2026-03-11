@@ -61,7 +61,7 @@ import com.pause.app.data.db.entity.WhitelistedDomain
         PendingReview::class,
         WebFilterConfig::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
