@@ -12,7 +12,7 @@ class UrlVisitLogRepository @Inject constructor(
 ) {
 
     suspend fun insert(log: UrlVisitLog): Long =
-        urlVisitLogDao.insert(log.copy(fullUrl = log.fullUrl.take(500)))
+        urlVisitLogDao.insert(log.copy(fullUrl = log.fullUrl.take(2000)))
 
     suspend fun getRecent(days: Int): List<UrlVisitLog> {
         val since = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
