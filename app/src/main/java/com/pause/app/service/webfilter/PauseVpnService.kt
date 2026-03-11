@@ -1,5 +1,7 @@
 package com.pause.app.service.webfilter
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import android.app.Notification
 import android.app.NotificationChannel
@@ -25,12 +27,16 @@ import java.io.FileOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.ServerSocket
 
 @AndroidEntryPoint
 class PauseVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val heartbeatPrefs: SharedPreferences by lazy {
+        getSharedPreferences(HEARTBEAT_PREFS, Context.MODE_PRIVATE)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -52,6 +58,7 @@ class PauseVpnService : VpnService() {
         vpnInterface = config.establish()
         if (vpnInterface != null) {
             startForeground(NOTIFICATION_ID, createNotification())
+            scope.launch { runBlockPageServer() }
             scope.launch { runDnsLoop() }
         }
     }
@@ -62,6 +69,64 @@ class PauseVpnService : VpnService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
+
+    private suspend fun runBlockPageServer() {
+        try {
+            ServerSocket(BLOCK_PAGE_PORT).use { serverSocket ->
+                serverSocket.reuseAddress = true
+                while (vpnInterface != null) {
+                    try {
+                        val client = serverSocket.accept()
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                client.use { socket ->
+                                    val reader = socket.getInputStream().bufferedReader()
+                                    val requestLine = reader.readLine() ?: return@launch
+                                    var host = "blocked"
+                                    var line = reader.readLine()
+                                    while (!line.isNullOrBlank()) {
+                                        if (line.startsWith("Host:", ignoreCase = true)) {
+                                            host = line.substringAfter(":").trim().substringBefore(":")
+                                        }
+                                        line = reader.readLine()
+                                    }
+                                    val domain = host
+                                    val html = buildBlockPage(domain)
+                                    val response = buildString {
+                                        append("HTTP/1.1 200 OK\r\n")
+                                        append("Content-Type: text/html; charset=utf-8\r\n")
+                                        append("Content-Length: ${html.toByteArray().size}\r\n")
+                                        append("Connection: close\r\n")
+                                        append("\r\n")
+                                        append(html)
+                                    }
+                                    socket.getOutputStream().write(response.toByteArray())
+                                }
+                            } catch (_: Exception) { }
+                        }
+                    } catch (_: Exception) { }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Block page server stopped", e)
+        }
+    }
+
+    private fun buildBlockPage(domain: String): String = """
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Blocked by Pause</title>
+        <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;
+        height:100vh;margin:0;background:#1a1a2e;}
+        .card{background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:400px;}
+        h1{color:#e74c3c}p{color:#555}</style></head>
+        <body><div class="card">
+        <h1>Blocked</h1>
+        <p><strong>$domain</strong> is blocked by Pause Web Filter.</p>
+        <p>This site has been blocked to help you stay focused.</p>
+        </div></body>
+        </html>
+    """.trimIndent()
 
     private suspend fun runDnsLoop() {
         val vpnFd = vpnInterface ?: return
@@ -83,7 +148,12 @@ class PauseVpnService : VpnService() {
                 FileOutputStream(vpnFd.fileDescriptor).use { output ->
                     while (vpnInterface != null) {
                         try {
-                            val cfg = if (++loopCount % 100 == 0) {
+                            if (++loopCount % 60 == 0) {
+                                heartbeatPrefs.edit()
+                                    .putLong(KEY_LAST_HEARTBEAT, System.currentTimeMillis())
+                                    .apply()
+                            }
+                            val cfg = if (loopCount % 100 == 0) {
                                 val newConfig = configRepo.getConfig()
                                 if (newConfig == null || !newConfig.vpnEnabled) {
                                     stopVpn()
@@ -109,7 +179,7 @@ class PauseVpnService : VpnService() {
                                 whitelistMatcher.isWhitelisted(domain) ->
                                     resolveUpstream(upstream, dnsPayload) ?: continue
                                 blocklistMatcher.isBlocked(domain) ->
-                                    DNSPacketParser.buildNXDomainResponse(query)
+                                    DNSPacketParser.buildRedirectResponse(query, BLOCK_PAGE_HOST)
                                 else ->
                                     resolveUpstream(upstream, dnsPayload) ?: continue
                             }
@@ -187,5 +257,9 @@ class PauseVpnService : VpnService() {
         private const val NOTIFICATION_ID = 2000
         private const val CHANNEL_ID = "web_filter"
         private const val TAG = "PauseVpnService"
+        const val HEARTBEAT_PREFS = "vpn_heartbeat"
+        const val KEY_LAST_HEARTBEAT = "vpn_last_heartbeat"
+        const val BLOCK_PAGE_PORT = 8080
+        private const val BLOCK_PAGE_HOST = "127.0.0.1"
     }
 }
