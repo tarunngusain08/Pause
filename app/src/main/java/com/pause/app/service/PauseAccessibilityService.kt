@@ -17,10 +17,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class PauseAccessibilityService : AccessibilityService() {
 
-    @Volatile private var currentForegroundPackage: String? = null
+    private val _foregroundPackage = MutableStateFlow<String?>(null)
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val lastExtractTime = mutableMapOf<String, Long>()
@@ -39,6 +40,9 @@ class PauseAccessibilityService : AccessibilityService() {
                 val count = insights.getUnlockCountSince(fifteenMinAgo)
                 if (count >= 5) {
                     overlayManager.showLockInterventionOverlay(count)
+                } else {
+                    // Gentle re-entry: brief mindful pause on low unlock counts
+                    overlayManager.showGentleReentryOverlay()
                 }
             }
         }
@@ -55,7 +59,8 @@ class PauseAccessibilityService : AccessibilityService() {
             overlayManager = overlayManager,
             appEntryPoint = appEntryPoint,
             serviceScope = serviceScope,
-            isForeground = { pkg -> currentForegroundPackage == pkg }
+            isForeground = { pkg -> _foregroundPackage.value == pkg },
+            context = applicationContext
         )
         registerReceiver(userPresentReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
     }
@@ -63,23 +68,23 @@ class PauseAccessibilityService : AccessibilityService() {
     override fun onKeyEvent(event: KeyEvent?): Boolean {
         if (!::appEntryPoint.isInitialized) return super.onKeyEvent(event)
         val strictSessionManager = appEntryPoint.getStrictSessionManager()
-        val parentalControlManager = appEntryPoint.getParentalControlManager()
+
+        // Block recents tray when a strict block overlay is active
+        if (event?.keyCode == KeyEvent.KEYCODE_APP_SWITCH && event.action == KeyEvent.ACTION_DOWN) {
+            val state = overlayManager.getState()
+            if (state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                return true
+            }
+        }
+
         if (event?.keyCode == KeyEvent.KEYCODE_POWER &&
             event.action == KeyEvent.ACTION_DOWN &&
             event.isLongPress
         ) {
-            when {
-                strictSessionManager.getActiveSession() != null -> {
-                    overlayManager.showPowerMenuBlockOverlay(strictSessionManager.getRemainingMs())
-                    return true
-                }
-                parentalControlManager.isActive() -> {
-                    serviceScope.launch {
-                        val remaining = parentalControlManager.getTimeUntilNextBandChange()
-                        overlayManager.showPowerMenuBlockOverlay(remaining)
-                    }
-                    return true
-                }
+            if (strictSessionManager.getActiveSession() != null) {
+                overlayManager.showPowerMenuBlockOverlay(strictSessionManager.getRemainingMs())
+                return true
             }
         }
         return super.onKeyEvent(event)
@@ -96,9 +101,9 @@ class PauseAccessibilityService : AccessibilityService() {
 
     private fun handleWindowStateChanged(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
-        if (packageName == currentForegroundPackage) return
+        if (packageName == _foregroundPackage.value) return
 
-        currentForegroundPackage = packageName
+        _foregroundPackage.value = packageName
 
         if (isExcludedPackage(packageName) || isLauncherPackage(packageName)) {
             overlayManager.dismiss()
