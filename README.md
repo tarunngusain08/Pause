@@ -61,7 +61,8 @@ app/src/main/java/com/pause/app/
 │   ├── db/                       # Room DB, entities, DAOs, type converters
 │   └── repository/               # Blacklist, Whitelist, Keyword, Insights, Session, etc.
 ├── service/
-│   ├── PauseAccessibilityService.kt  # Foreground detection, interception, URL reader hook
+│   ├── PauseAccessibilityService.kt  # Foreground detection, URL capture; delegates to InterceptionPipeline
+│   ├── InterceptionPipeline.kt      # Strict → Commitment → Parental → Standard interception stages
 │   ├── overlay/                  # OverlayManager, Delay/Reflection/Commitment/Strict/Lock overlays
 │   └── webfilter/                # PauseVpnService, DNSPacketParser, BlocklistMatcher, etc.
 │       └── url/                  # BrowserURLReader, URLClassifier, KeywordMatcher, URLCaptureQueue
