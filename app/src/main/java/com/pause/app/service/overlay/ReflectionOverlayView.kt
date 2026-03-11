@@ -16,12 +16,12 @@ class ReflectionOverlayView(
     private val onReasonSelected: (String) -> Unit
 ) : FrameLayout(context) {
 
-    private val appNameText: TextView
-    private val btnBored: Button
-    private val btnHabit: Button
-    private val btnReplying: Button
-    private val btnIntentional: Button
-    private val progressTimeout: ProgressBar
+    private lateinit var appNameText: TextView
+    private lateinit var btnBored: Button
+    private lateinit var btnHabit: Button
+    private lateinit var btnReplying: Button
+    private lateinit var btnIntentional: Button
+    private lateinit var progressTimeout: ProgressBar
 
     private var isDismissed = false
     private val timeoutTimer = object : CountDownTimer(TIMEOUT_MS, TICK_INTERVAL_MS) {
