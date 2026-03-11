@@ -53,7 +53,7 @@ This document describes how the Pause Android app is structured at the code leve
 - **Application:** `PauseApplication` is annotated with `@HiltAndroidApp` and implements `Configuration.Provider` for WorkManager with `HiltWorkerFactory`.
 - **Modules:** `DatabaseModule` provides `PauseDatabase` and DAOs; `AppModule` provides repositories, overlay manager, session managers, and other app-scoped objects.
 - **Entry Points** (for non-Hilt contexts):
-  - **PauseAccessibilityEntryPoint** — Used by `PauseAccessibilityService` to get `OverlayManager`, `AppRepository`, `SessionRepository`, `LaunchRepository`, `AllowanceTracker`, `PreferencesManager`, `FeatureFlags`, `StrictSessionManager`, `ParentalControlManager`, `ParentalBlockedAppRepository`, `WebFilterConfigRepository`, `BrowserURLReader`, `URLClassifier`, `URLCaptureQueue`, `AutoBlacklistEngine`, `InsightsRepository`.
+  - **PauseAccessibilityEntryPoint** — Used by `PauseAccessibilityService` to get `OverlayManager`, `AppRepository`, `LaunchRepository`, `AllowanceTracker`, `SessionRepository`, `ParentalBlockedAppRepository`, `PreferencesManager`, `StrictSessionManager`, `ParentalControlManager`, `InsightsRepository`, `BrowserURLReader`, `URLClassifier`, `URLCaptureQueue`, `AutoBlacklistEngine`, `WebFilterConfigRepository`.
   - **VpnEntryPoint** — Used by `PauseVpnService` to get `BlocklistMatcher`, `WhitelistMatcher`, `WebFilterConfigRepository` (also exposes `BlacklistRepository`, `WhitelistRepository`).
   - **BootEntryPoint** — Used by `BootReceiver` to get `StrictSessionManager`, `ParentalControlManager`, `WebFilterConfigRepository` for resuming sessions and VPN after boot.
 
@@ -63,9 +63,9 @@ Only the minimum set of dependencies is exposed per entry point to keep services
 
 ## 3. Navigation
 
-- **Single Activity:** `MainActivity` hosts Compose and sets `setContent { PauseNavGraph() }`.
-- **PauseNavGraph** uses a single `NavHost` and `rememberNavController()`. Start destination is either `"onboarding"` or `"home"` based on `OnboardingViewModel.onboardingComplete`.
-- **Routes** are string-based: `"home"`, `"app_selection"`, `"parent_dashboard"`, `"web_filter_dashboard"`, `"domain_blacklist"`, `"unblock_request/{domain}"`, etc.
+- **Single Activity:** `MainActivity` hosts Compose and sets `setContent { PauseTheme { Surface { PauseNavGraph() } } }`.
+- **PauseNavGraph** uses a single `NavHost` and `rememberNavController()`. Start destination is `Routes.ONBOARDING` or `Routes.HOME` based on `OnboardingViewModel.onboardingComplete` (via `collectAsStateWithLifecycle`).
+- **Routes** — Centralized in `Routes` object: `Routes.HOME`, `Routes.APP_SELECTION`, `Routes.PARENT_DASHBOARD`, `Routes.WEB_FILTER_DASHBOARD`, `Routes.UNBLOCK_REQUEST`, etc.
 - **Deep link:** `pause://unblock-request?domain={domain}` opens `UnblockRequestScreen` with the given domain (e.g. from the block page “Request Review” button).
 
 ---
