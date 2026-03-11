@@ -15,7 +15,7 @@
 - **Focus Mode** — Timed sessions with increased friction (no full block)
 - **Commitment Mode** — Full block on selected apps for a set duration, with 90s cooldown to break
 - **Streaks & shields** — Day valid if limits respected; optional grace day per week
-- **Lock screen intervention** — Awareness overlay after repeated unlocks (e.g. 5 in 15 min)
+- **Lock screen intervention** — Awareness overlay after repeated unlocks (e.g. 5 in 15 min); gentle “Pause. Breathe.” overlay on lower unlock counts
 - **Weekly & monthly insights** — Local aggregation only (no cloud)
 - **Accountability partner** — Daily summary sent via device SMS (user taps send)
 
@@ -69,6 +69,7 @@ app/src/main/java/com/pause/app/
 ├── receiver/                     # BootReceiver (restart VPN / restore state)
 ├── worker/                       # MidnightResetWorker
 └── ui/                           # Compose screens, ViewModels, navigation
+    └── navigation/               # PauseNavGraph, Routes
 ```
 
 ---
