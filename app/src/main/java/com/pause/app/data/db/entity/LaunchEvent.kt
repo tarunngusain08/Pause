@@ -16,7 +16,8 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.NO_ACTION
         )
     ],
-    indices = [Index("package_name"), Index("launched_at")]
+    indices = [Index("package_name"), Index("launched_at"),
+        Index(value = ["package_name", "launched_at"])]
 )
 data class LaunchEvent(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
