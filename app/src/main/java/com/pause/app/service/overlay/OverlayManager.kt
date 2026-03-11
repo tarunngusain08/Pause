@@ -48,7 +48,7 @@ class OverlayManager @Inject constructor(
 
     @MainThread
     fun showReflectionOverlay(
-        packageName: String,
+        @Suppress("UNUSED_PARAMETER") packageName: String,
         appName: String,
         onReasonSelected: (String) -> Unit
     ) {
