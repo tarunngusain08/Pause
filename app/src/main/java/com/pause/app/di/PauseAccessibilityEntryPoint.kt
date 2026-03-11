@@ -1,6 +1,5 @@
 package com.pause.app.di
 
-import com.pause.app.data.preferences.FeatureFlags
 import com.pause.app.data.preferences.PreferencesManager
 import com.pause.app.data.repository.AppRepository
 import com.pause.app.data.repository.InsightsRepository
@@ -25,7 +24,6 @@ import dagger.hilt.components.SingletonComponent
 interface PauseAccessibilityEntryPoint {
     fun getOverlayManager(): OverlayManager
     fun getAppRepository(): AppRepository
-    fun getFeatureFlags(): FeatureFlags
     fun getLaunchRepository(): LaunchRepository
     fun getAllowanceTracker(): AllowanceTracker
     fun getSessionRepository(): SessionRepository
