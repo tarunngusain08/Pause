@@ -13,7 +13,7 @@ class CooldownOverlayView(
     durationSeconds: Int,
     private val onCancel: () -> Unit,
     private val onComplete: () -> Unit
-) : FrameLayout(context) {
+) : FrameLayout(context), TimerCancellable {
 
     private val countdownText: TextView
     private var timer: CountDownTimer? = null
@@ -35,9 +35,13 @@ class CooldownOverlayView(
         }.start()
     }
 
-    override fun onDetachedFromWindow() {
+    override fun cancelTimers() {
         isDismissed = true
         timer?.cancel()
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelTimers()
         super.onDetachedFromWindow()
     }
 }
