@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * Device Admin receiver that prevents uninstalling Pause when Parental Control is active.
+ * Device Admin receiver that prevents uninstalling Focus when Parental Control is active.
  * Parent must explicitly enable this during setup. Can be disabled via PIN entry.
  */
 class PauseDeviceAdminReceiver : DeviceAdminReceiver() {
@@ -21,7 +21,7 @@ class PauseDeviceAdminReceiver : DeviceAdminReceiver() {
     }
 
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
-        return "Disabling Device Admin will allow Pause to be uninstalled. " +
+        return "Disabling Device Admin will allow Focus to be uninstalled. " +
             "Parental controls will no longer prevent uninstallation."
     }
 }
