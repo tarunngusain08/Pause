@@ -2,30 +2,14 @@ package com.pause.app.ui.home
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.pause.app.data.db.entity.Session
-import com.pause.app.data.db.entity.MonitoredApp
-import com.pause.app.data.repository.AppRepository
-import com.pause.app.data.repository.InsightsRepository
-import com.pause.app.data.repository.LaunchRepository
-import com.pause.app.data.preferences.PreferencesManager
-import com.pause.app.data.repository.SessionRepository
-import com.pause.app.data.repository.StreakRepository
-import com.pause.app.service.AllowanceTracker
 import com.pause.app.service.strict.StrictSessionManager
-import com.pause.app.util.DateUtils
 import com.pause.app.util.PermissionHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class PermissionStatus(
@@ -38,92 +22,10 @@ data class PermissionStatus(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val appRepository: AppRepository,
-    private val launchRepository: LaunchRepository,
-    private val streakRepository: StreakRepository,
-    private val strictSessionManager: StrictSessionManager,
-    private val sessionRepository: SessionRepository,
-    private val preferencesManager: PreferencesManager,
-    private val allowanceTracker: AllowanceTracker,
-    private val insightsRepository: InsightsRepository
+    private val strictSessionManager: StrictSessionManager
 ) : ViewModel() {
 
-    val monitoredApps: StateFlow<List<MonitoredApp>> =
-        appRepository.getActiveMonitoredApps()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val todayLaunches: StateFlow<Map<String, Int>> =
-        launchRepository.getTodayLaunchesAll()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
-    val strictSession: StateFlow<Session?> =
-        strictSessionManager.activeSession
-
-    val focusSession: StateFlow<Session?> =
-        sessionRepository.getActiveFocusSessionFlow()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    val commitmentSession: StateFlow<Session?> =
-        sessionRepository.getActiveCommitmentSessionFlow()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    val streak = streakRepository.getStreakFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    private val _streakExpiresInMs = MutableStateFlow<Long?>(null)
-    val streakExpiresInMs: StateFlow<Long?> = _streakExpiresInMs.asStateFlow()
-
-    private val _remainingAllowanceMinutes = MutableStateFlow<Int?>(null)
-    val remainingAllowanceMinutes: StateFlow<Int?> = _remainingAllowanceMinutes.asStateFlow()
-
-    private val _unlocksToday = MutableStateFlow(0)
-    val unlocksToday: StateFlow<Int> = _unlocksToday.asStateFlow()
-
-    private val _costOfScrollMinutes = MutableStateFlow<Int?>(null)
-    val costOfScrollMinutes: StateFlow<Int?> = _costOfScrollMinutes.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            // Live countdown for streak at-risk (updates every minute)
-            while (isActive) {
-                val s = streak.value
-                val todayMidnight = DateUtils.getTodayMidnight()
-                if (s != null && s.currentStreakDays > 0 && s.lastValidDay < todayMidnight) {
-                    val nextMidnight = todayMidnight + 24 * 60 * 60 * 1000L
-                    _streakExpiresInMs.value = (nextMidnight - System.currentTimeMillis()).coerceAtLeast(0)
-                } else {
-                    _streakExpiresInMs.value = null
-                }
-                delay(60_000)
-            }
-        }
-        viewModelScope.launch {
-            val lastShown = preferencesManager.lastCostOfScrollShownDate.first()
-            val todayMidnight = com.pause.app.util.DateUtils.getTodayMidnight()
-            if (lastShown == null || lastShown < todayMidnight) {
-                val yesterdayLaunches = launchRepository.getYesterdayTotalLaunchCount()
-                val avgMinutes = 5
-                val estimated = yesterdayLaunches * avgMinutes
-                if (estimated > 0) _costOfScrollMinutes.value = estimated
-            }
-        }
-        viewModelScope.launch {
-            val remaining = allowanceTracker.getRemainingAllowanceMinutes()
-            if (remaining != Int.MAX_VALUE) _remainingAllowanceMinutes.value = remaining
-        }
-        viewModelScope.launch {
-            insightsRepository.getDailyUnlockCount().collect { count ->
-                _unlocksToday.value = count
-            }
-        }
-    }
-
-    fun dismissCostOfScrollCard() {
-        viewModelScope.launch {
-            preferencesManager.setLastCostOfScrollShownDate(System.currentTimeMillis())
-            _costOfScrollMinutes.value = null
-        }
-    }
+    val strictSession: StateFlow<Session?> = strictSessionManager.activeSession
 
     private val _permissionStatus = MutableStateFlow(PermissionStatus())
     val permissionStatus: StateFlow<PermissionStatus> = _permissionStatus.asStateFlow()
