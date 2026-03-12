@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F0F4F8"
+    android:background="#1A1A2E"
     android:gravity="center"
     android:orientation="vertical"
     android:padding="32dp">
@@ -12,7 +12,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="App is blocked"
-        android:textColor="#1A1A2E"
+        android:textColor="#E0E0E0"
         android:textSize="20sp"
         android:textStyle="bold" />
 
@@ -41,8 +41,8 @@
         android:layout_height="48dp"
         android:layout_marginTop="32dp"
         android:text="Go Back"
-        android:textColor="#1A1A2E"
-        android:backgroundTint="#D8E2E8"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#4A90A4"
         android:paddingStart="32dp"
         android:paddingEnd="32dp" />
 
