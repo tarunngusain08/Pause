@@ -12,32 +12,27 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class StrictSetupUiState(
-    /** Preset duration index (6 = Custom) */
-    val selectedPresetIndex: Int = 2,
-    val customMinutesRaw: Int = 30,
+    /** Preset duration index (0–3 for 4 presets) */
+    val selectedPresetIndex: Int = 1,
+    val customMinutesText: String = "30",
     val useCustomDuration: Boolean = false,
     val showFirstConfirm: Boolean = false,
     val showSecondConfirm: Boolean = false,
     val isStarting: Boolean = false,
     val startError: String? = null
 ) {
-    /** Rounds to nearest 5, clamped to 5..480 */
-    private fun roundToFive(minutes: Int): Int {
-        val rounded = ((minutes + 2) / 5) * 5
-        return rounded.coerceIn(5, 480)
+    private fun parseCustomMinutes(): Int {
+        val parsed = customMinutesText.filter { it.isDigit() }.toIntOrNull() ?: 0
+        return parsed.coerceIn(0, 480)
     }
 
     val selectedDurationMs: Long
         get() = if (useCustomDuration) {
-            roundToFive(customMinutesRaw).toLong() * 60_000L
+            parseCustomMinutes().toLong() * 60_000L
         } else {
             StrictModeSetupViewModel.DURATION_PRESETS.getOrNull(selectedPresetIndex)?.first
                 ?: 60 * 60 * 1000L
         }
-
-    /** Rounded minutes for display (e.g. "Will be rounded to 25 min") */
-    val roundedCustomMinutes: Int
-        get() = roundToFive(customMinutesRaw)
 }
 
 @HiltViewModel
@@ -58,8 +53,9 @@ class StrictModeSetupViewModel @Inject constructor(
         _uiState.update { it.copy(useCustomDuration = true) }
     }
 
-    fun setCustomMinutesRaw(rawMinutes: Int) {
-        _uiState.update { it.copy(customMinutesRaw = rawMinutes.coerceIn(0, 480)) }
+    fun setCustomMinutesText(text: String) {
+        val filtered = text.filter { it.isDigit() }.take(4)
+        _uiState.update { it.copy(customMinutesText = filtered) }
     }
 
     fun showFirstConfirmation() {
@@ -92,13 +88,10 @@ class StrictModeSetupViewModel @Inject constructor(
 
     companion object {
         val DURATION_PRESETS = listOf(
-            5 * 60 * 1000L to "5 min",
             15 * 60 * 1000L to "15 min",
             30 * 60 * 1000L to "30 min",
             60 * 60 * 1000L to "1 hr",
-            2 * 60 * 60 * 1000L to "2 hr",
-            4 * 60 * 60 * 1000L to "4 hr"
+            2 * 60 * 60 * 1000L to "2 hr"
         )
-        const val CUSTOM_PRESET_INDEX = 6
     }
 }
