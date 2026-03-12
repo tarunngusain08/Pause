@@ -2,45 +2,46 @@ package com.pause.app.ui.strict
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.pause.app.data.db.entity.MonitoredApp
-import com.pause.app.data.repository.AppRepository
 import com.pause.app.service.strict.StrictSessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import javax.inject.Inject
 
 data class StrictSetupUiState(
-    val monitoredApps: List<MonitoredApp> = emptyList(),
-    val selectedPackages: Set<String> = emptySet(),
-    /** Preset duration index (-1 = custom) */
-    val selectedPresetIndex: Int = 1,
-    val customHours: Int = 0,
-    val customMinutes: Int = 30,
+    /** Preset duration index (6 = Custom) */
+    val selectedPresetIndex: Int = 2,
+    val customMinutesRaw: Int = 30,
     val useCustomDuration: Boolean = false,
     val showFirstConfirm: Boolean = false,
     val showSecondConfirm: Boolean = false,
     val isStarting: Boolean = false,
     val startError: String? = null
 ) {
+    /** Rounds to nearest 5, clamped to 5..480 */
+    private fun roundToFive(minutes: Int): Int {
+        val rounded = ((minutes + 2) / 5) * 5
+        return rounded.coerceIn(5, 480)
+    }
+
     val selectedDurationMs: Long
         get() = if (useCustomDuration) {
-            (customHours * 60L + customMinutes) * 60_000L
+            roundToFive(customMinutesRaw).toLong() * 60_000L
         } else {
             StrictModeSetupViewModel.DURATION_PRESETS.getOrNull(selectedPresetIndex)?.first
                 ?: 60 * 60 * 1000L
         }
+
+    /** Rounded minutes for display (e.g. "Will be rounded to 25 min") */
+    val roundedCustomMinutes: Int
+        get() = roundToFive(customMinutesRaw)
 }
 
 @HiltViewModel
 class StrictModeSetupViewModel @Inject constructor(
-    private val appRepository: AppRepository,
     private val strictSessionManager: StrictSessionManager
 ) : ViewModel() {
 
@@ -48,31 +49,6 @@ class StrictModeSetupViewModel @Inject constructor(
     val uiState: StateFlow<StrictSetupUiState> = _uiState.asStateFlow()
 
     val activeSession = strictSessionManager.activeSession
-
-    init {
-        viewModelScope.launch {
-            appRepository.getActiveMonitoredApps().collect { apps ->
-                _uiState.update { it.copy(monitoredApps = apps) }
-            }
-        }
-    }
-
-    fun toggleAppSelection(packageName: String) {
-        _uiState.update { state ->
-            val newSet = if (packageName in state.selectedPackages) {
-                state.selectedPackages - packageName
-            } else {
-                state.selectedPackages + packageName
-            }
-            state.copy(selectedPackages = newSet)
-        }
-    }
-
-    fun selectAllApps() {
-        _uiState.update { state ->
-            state.copy(selectedPackages = state.monitoredApps.map { it.packageName }.toSet())
-        }
-    }
 
     fun selectPreset(index: Int) {
         _uiState.update { it.copy(selectedPresetIndex = index, useCustomDuration = false) }
@@ -82,12 +58,8 @@ class StrictModeSetupViewModel @Inject constructor(
         _uiState.update { it.copy(useCustomDuration = true) }
     }
 
-    fun setCustomHours(hours: Int) {
-        _uiState.update { it.copy(customHours = hours.coerceIn(0, 8)) }
-    }
-
-    fun setCustomMinutes(minutes: Int) {
-        _uiState.update { it.copy(customMinutes = minutes.coerceIn(0, 55)) }
+    fun setCustomMinutesRaw(rawMinutes: Int) {
+        _uiState.update { it.copy(customMinutesRaw = rawMinutes.coerceIn(0, 480)) }
     }
 
     fun showFirstConfirmation() {
@@ -109,12 +81,8 @@ class StrictModeSetupViewModel @Inject constructor(
     fun startSession() {
         viewModelScope.launch {
             val state = _uiState.value
-            if (state.selectedPackages.isEmpty()) {
-                _uiState.update { it.copy(startError = "Select at least one app") }
-                return@launch
-            }
             _uiState.update { it.copy(isStarting = true, showSecondConfirm = false, startError = null) }
-            val result = strictSessionManager.startSession(state.selectedDurationMs, state.selectedPackages.toList())
+            val result = strictSessionManager.startSession(state.selectedDurationMs)
             _uiState.update { it.copy(isStarting = false) }
             result.onFailure { error ->
                 _uiState.update { it.copy(startError = error.message ?: "Failed to start session") }
@@ -124,10 +92,13 @@ class StrictModeSetupViewModel @Inject constructor(
 
     companion object {
         val DURATION_PRESETS = listOf(
+            5 * 60 * 1000L to "5 min",
+            15 * 60 * 1000L to "15 min",
             30 * 60 * 1000L to "30 min",
-            60 * 60 * 1000L to "1 hour",
-            2 * 60 * 60 * 1000L to "2 hours",
-            4 * 60 * 60 * 1000L to "4 hours"
+            60 * 60 * 1000L to "1 hr",
+            2 * 60 * 60 * 1000L to "2 hr",
+            4 * 60 * 60 * 1000L to "4 hr"
         )
+        const val CUSTOM_PRESET_INDEX = 6
     }
 }
