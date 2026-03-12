@@ -13,8 +13,7 @@ Browser / any app
        ▼
 PauseVpnService (TUN interface)
        │
-       ├─ WhitelistMatcher.isWhitelisted(domain) → true  → forward to upstream DNS
-       ├─ BlocklistMatcher.isBlocked(domain)    → true  → return NXDOMAIN
+       ├─ BlocklistMatcher.isBlocked(domain)    → true  → redirect to block page (127.0.0.1)
        └─ else                                   → forward to upstream DNS
 
 In parallel (when URL capture is enabled):
@@ -33,17 +32,16 @@ PauseAccessibilityService (TYPE_WINDOW_CONTENT_CHANGED)
 
 ## 2. PauseVpnService
 
-- **Extends** `VpnService`. Started via explicit intent with action `ACTION_START` or `ACTION_STOP` (e.g. from Parent Dashboard when Web Filter is toggled).
+- **Extends** `VpnService`. Started via explicit intent with action `ACTION_START` or `ACTION_STOP` (e.g. from Content Shield screen when Adult Content Filter is toggled).
 - **Establishment:** Uses `VpnService.Builder`: address `10.0.0.1/32`, default route `0.0.0.0/0`, DNS server `10.0.0.1`, MTU 1500. **Excludes the Focus app** via `addDisallowedApplication(packageName)` to avoid recursive filtering.
 - **Foreground:** Runs as a foreground service with a notification (“Web filtering active”) so the system is less likely to kill it.
 - **DNS loop:** Runs on a coroutine; reads and writes via `FileInputStream` and `FileOutputStream` on the same `vpnInterface.fileDescriptor`. TUN delivers **IPv4 packets**; the loop uses `DNSPacketParser.extractDnsInfo(packet)` to locate the UDP DNS payload, then `parseQuery(dnsPayload)` to get the queried domain. The decision:
-  1. **WhitelistMatcher.isWhitelisted(domain)** → forward to upstream DNS; wrap the response with `wrapResponse()` and write back.
-  2. **BlocklistMatcher.isBlocked(domain)** → build NXDOMAIN with `buildNXDomainResponse(query)`, wrap, and write back.
-  3. Otherwise → forward to upstream DNS, wrap, and write back.
+  1. **BlocklistMatcher.isBlocked(domain)** → build redirect response with `buildRedirectResponse(query, "127.0.0.1")` pointing to block page server on port 80; wrap and write back.
+  2. Otherwise → forward to upstream DNS, wrap, and write back.
 
 Upstream DNS is from `WebFilterConfig.upstreamDns` (default `8.8.8.8`). Config is re-checked every 100 packets; if `vpnEnabled` becomes false, the loop stops. VPN only runs when `config.vpnEnabled` is true.
 
-**Block page:** The current implementation returns NXDOMAIN for blocked domains; the browser shows its own “site can’t be reached” page. A `block_page.html` asset exists for future use (e.g. a local HTTP server); it is not currently served. `buildRedirectResponse()` exists for a potential 127.0.0.1 redirect path.
+**Block page:** Blocked domains are redirected to 127.0.0.1. A local HTTP server listens on port 80 and serves a custom block page with the blocked domain name. The block_page.html asset exists for the deep-link flow; the VPN uses an inline HTML template in buildBlockPage().
 
 ---
 
@@ -57,12 +55,9 @@ Upstream DNS is from `WebFilterConfig.upstreamDns` (default `8.8.8.8`). Config i
 
 ---
 
-## 4. BlocklistMatcher and WhitelistMatcher
+## 4. BlocklistMatcher
 
-- **BlocklistMatcher** — Holds an in-memory `snapshot: Set<String>?` (with `Mutex`) loaded from `BlacklistRepository.getActiveDomainsAsList()`. `isBlocked(domain)` normalizes (lowercase, strip `www.`), checks exact match and wildcard match (`*.domain.com`). Reloads from DB if the snapshot is null or older than 60 seconds. `reloadFromDB()` is also called by `AutoBlacklistEngine` when a keyword match adds a domain.
-- **WhitelistMatcher** — Same pattern using `WhitelistRepository.getAllAsList()`; supports exact and wildcard (`*.domain`) matches. Whitelist is checked **before** blacklist in the VPN loop so whitelisted domains always resolve.
-
-Both are singletons provided by Hilt and used by `PauseVpnService` via `VpnEntryPoint`.
+- **BlocklistMatcher** — Holds an in-memory `snapshot: Set<String>?` (with `Mutex`) loaded from `BlacklistRepository.getActiveDomainsAsList()`. `isBlocked(domain)` normalizes (lowercase, strip `www.`), checks exact match and wildcard match (`*.domain.com`). Reloads from DB if the snapshot is null or older than 60 seconds. `reloadFromDB()` is also called by `AutoBlacklistEngine` when a keyword match adds a domain. Provided by Hilt and used by `PauseVpnService` via `VpnEntryPoint`.
 
 ---
 
@@ -77,18 +72,18 @@ Browser view IDs can change with updates; the EditText fallback reduces fragilit
 
 ### 5.2 URL Classification, AutoBlacklistEngine, and URLCaptureQueue
 
-- In `handleWindowContentChanged`, when the app is a known browser and URL capture is enabled, the raw URL is normalized and the domain is extracted (`URLNormalizer.extractDomain`). **URLClassifier.classify(rawUrl, domain)** returns `Pair<URLClassification, KeywordMatch?>` (CLEAN, KEYWORD_MATCH, BLACKLISTED, WHITELISTED). Classification uses whitelist, blacklist, and `KeywordMatcher` (domain, path, query).
+- In `handleWindowContentChanged`, when the app is a known browser and URL capture is enabled, the raw URL is normalized and the domain is extracted (`URLNormalizer.extractDomain`). **URLClassifier.classify(rawUrl, domain)** returns `Pair<URLClassification, KeywordMatch?>` (CLEAN, KEYWORD_MATCH, BLACKLISTED, WHITELISTED). Classification uses blacklist and `KeywordMatcher` (domain, path, query).
 - **URLCaptureQueue.enqueue(...)** — Deduplicates by `domain:browserPackage` within 5 seconds; appends `UrlVisitLog` (fullUrl truncated to 500 chars) to a pending list; flushes to `UrlVisitLogRepository` when the list reaches 10 entries.
 - **AutoBlacklistEngine.onKeywordMatch(domain, keyword, url)** — Called when classification is `KEYWORD_MATCH`. If `autoBlacklistOnKeywordMatch` is enabled in config, adds the domain to `BlacklistRepository` (source `AUTO_KEYWORD`), calls `BlocklistMatcher.reloadFromDB()`, and inserts a `PendingReview` record. The VPN will block the domain on subsequent DNS lookups.
 
-URL visit log and auto-blacklist are decoupled from the VPN packet path; the VPN only sees DNS and the in-memory block/whitelist sets.
+URL visit log and auto-blacklist are decoupled from the VPN packet path; the VPN only sees DNS and the in-memory blocklist set.
 
 ---
 
 ## 6. Block Page and Unblock Request
 
-- **Block page:** The VPN returns NXDOMAIN for blocked domains; the browser shows its own “site can’t be reached” / “ERR_NAME_NOT_RESOLVED” page. A `block_page.html` asset exists (`app/src/main/assets/block_page.html`) with “This site is blocked by Focus” and a “Request Review” link that deep-links to `focus://unblock-request?domain={domain}`. This asset is **not currently served** by a local HTTP server; a future implementation could use `buildRedirectResponse()` and a LocalHTTPServer to show the block page for HTTP requests.
-- **Unblock request:** The app’s deep link `focus://unblock-request?domain={domain}` opens **UnblockRequestScreen** with that domain. The child can add a note and submit; the app creates a **PendingReview**. The parent can approve (e.g. add domain to whitelist) or deny from the Parent Dashboard.
+- **Block page:** The VPN redirects blocked domains to 127.0.0.1; a local HTTP server on port 80 serves a custom block page. The `block_page.html` asset exists for the deep-link flow with "This site is blocked by Focus" and a "Request Review" link that deep-links to `focus://unblock-request?domain={domain}`.
+- **Unblock request:** The app’s deep link `focus://unblock-request?domain={domain}` opens **UnblockRequestScreen** with that domain. The child can add a note and submit; the app creates a **PendingReview**. The parent can approve (e.g. add domain to blacklist as allowed) or deny from Content Shield.
 
 ---
 
