@@ -1,6 +1,6 @@
-# Pause — Implementation Architecture
+# Focus — Implementation Architecture
 
-This document describes how the Pause Android app is structured at the code level: layers, entry points, and how the main subsystems interact.
+This document describes how the Focus Android app is structured at the code level: layers, entry points, and how the main subsystems interact.
 
 ---
 
@@ -66,7 +66,7 @@ Only the minimum set of dependencies is exposed per entry point to keep services
 - **Single Activity:** `MainActivity` hosts Compose and sets `setContent { PauseTheme { Surface { PauseNavGraph() } } }`.
 - **PauseNavGraph** uses a single `NavHost` and `rememberNavController()`. Start destination is `Routes.ONBOARDING` or `Routes.HOME` based on `OnboardingViewModel.onboardingComplete` (via `collectAsStateWithLifecycle`).
 - **Routes** — Centralized in `Routes` object: `Routes.HOME`, `Routes.APP_SELECTION`, `Routes.PARENT_DASHBOARD`, `Routes.WEB_FILTER_DASHBOARD`, `Routes.UNBLOCK_REQUEST`, etc.
-- **Deep link:** `pause://unblock-request?domain={domain}` opens `UnblockRequestScreen` with the given domain (e.g. from the block page “Request Review” button).
+- **Deep link:** `focus://unblock-request?domain={domain}` opens `UnblockRequestScreen` with the given domain (e.g. from the block page “Request Review” button).
 
 ---
 
@@ -79,10 +79,10 @@ Only the minimum set of dependencies is exposed per entry point to keep services
    - Nav graph shows `OnboardingScreen`; user grants Accessibility, overlay, and (optionally) usage access, then selects monitored apps. On complete, `onboardingComplete` is persisted and nav moves to `home`.
 
 3. **Accessibility Service**  
-   - User enables Pause in Settings → Accessibility. `PauseAccessibilityService.onServiceConnected()` runs; it obtains `OverlayManager` and other deps via `PauseAccessibilityEntryPoint` and then handles `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOW_CONTENT_CHANGED` for app interception and URL capture.
+   - User enables Focus in Settings → Accessibility. `PauseAccessibilityService.onServiceConnected()` runs; it obtains `OverlayManager` and other deps via `PauseAccessibilityEntryPoint` and then handles `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOW_CONTENT_CHANGED` for app interception and URL capture.
 
 4. **Web Filter (if enabled by parent)**  
-   - Parent enables Web Filter from Parent Dashboard; app starts `PauseVpnService` with `ACTION_START`. VPN establishes a TUN interface (excluding the Pause app via `addDisallowedApplication`) and runs the DNS loop on a coroutine. `BootReceiver` re-starts VPN after `BOOT_COMPLETED` / `LOCKED_BOOT_COMPLETED` if `vpnEnabled` was true.
+   - Parent enables Web Filter from Parent Dashboard; app starts `PauseVpnService` with `ACTION_START`. VPN establishes a TUN interface (excluding the Focus app via `addDisallowedApplication`) and runs the DNS loop on a coroutine. `BootReceiver` re-starts VPN after `BOOT_COMPLETED` / `LOCKED_BOOT_COMPLETED` if `vpnEnabled` was true.
 
 ---
 
