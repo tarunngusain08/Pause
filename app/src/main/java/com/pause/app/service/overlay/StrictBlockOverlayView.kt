@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
+import android.view.animation.AnimationUtils
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -18,7 +19,7 @@ class StrictBlockOverlayView(
     private val emergencyExitController: EmergencyExitController,
     private val onGoBack: () -> Unit,
     private val onShowConfirmation: () -> Unit
-) : FrameLayout(context) {
+) : FrameLayout(context), TimerCancellable {
 
     private val appNameLabel: TextView
     private val remainingText: TextView
@@ -40,7 +41,6 @@ class StrictBlockOverlayView(
         goBackButton = findViewById(R.id.strict_block_go_back)
         emergencyButton = findViewById(R.id.strict_block_emergency_button)
 
-        setBackgroundColor(0xFF1A1A2E.toInt())
         appNameLabel.text = "$appName is blocked"
         updateRemaining(remainingMs)
 
@@ -54,16 +54,24 @@ class StrictBlockOverlayView(
                     handler.postDelayed(resetRunnable, EmergencyExitController.TAP_WINDOW_MS)
                 }
                 is EmergencyTapResult.ShowConfirmation -> {
-                    handler.removeCallbacks(resetRunnable)
                     onShowConfirmation()
                 }
             }
         }
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        startAnimation(AnimationUtils.loadAnimation(context, R.anim.overlay_fade_in))
+    }
+
     override fun onDetachedFromWindow() {
-        handler.removeCallbacks(resetRunnable)
+        cancelTimers()
         super.onDetachedFromWindow()
+    }
+
+    override fun cancelTimers() {
+        handler.removeCallbacks(resetRunnable)
     }
 
     fun updateRemaining(ms: Long) {
@@ -71,11 +79,6 @@ class StrictBlockOverlayView(
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
         remainingText.text = String.format("%d:%02d remaining", minutes, seconds)
-    }
-
-    fun resetTapState() {
-        emergencyExitController.reset()
-        updateDots()
     }
 
     private fun updateDots() {
