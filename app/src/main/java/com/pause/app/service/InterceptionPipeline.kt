@@ -1,6 +1,7 @@
 package com.pause.app.service
 
 import android.content.Context
+import android.content.pm.PackageManager
 import com.pause.app.di.PauseAccessibilityEntryPoint
 import com.pause.app.service.overlay.OverlayManager
 
@@ -11,13 +12,14 @@ import com.pause.app.service.overlay.OverlayManager
 class InterceptionPipeline(
     private val overlayManager: OverlayManager,
     private val appEntryPoint: PauseAccessibilityEntryPoint,
-    private val isForeground: (String) -> Boolean,
-    private val context: Context
+    private val context: Context,
+    private val isForeground: (String) -> Boolean
 ) {
-    suspend fun evaluate(pkg: String): Boolean {
-        return strictStage(pkg)
-            || contentShieldStage(pkg)
-            || run { overlayManager.dismissBlockIfAllowed(); overlayManager.dismiss(); false }
+    suspend fun evaluate(pkg: String) {
+        if (strictStage(pkg)) return
+        if (contentShieldStage(pkg)) return
+        overlayManager.dismissBlockIfAllowed()
+        overlayManager.dismiss()
     }
 
     private suspend fun strictStage(pkg: String): Boolean {
@@ -25,7 +27,7 @@ class InterceptionPipeline(
         strictSessionManager.getActiveSession() ?: return false
 
         return if (strictSessionManager.isPackageBlocked(pkg)) {
-            if (!isForeground(pkg)) return true
+            if (!isForeground(pkg)) return false
             overlayManager.showStrictBlockOverlay(
                 appName = resolveAppName(pkg),
                 remainingMs = strictSessionManager.getRemainingMs(),
@@ -42,7 +44,7 @@ class InterceptionPipeline(
     private suspend fun contentShieldStage(pkg: String): Boolean {
         val contentShieldManager = appEntryPoint.getContentShieldManager()
         if (!contentShieldManager.isPackageBlocked(pkg)) return false
-        if (!isForeground(pkg)) return true
+        if (!isForeground(pkg)) return false
         overlayManager.showContentShieldBlockOverlay(resolveAppName(pkg))
         return true
     }
@@ -52,7 +54,7 @@ class InterceptionPipeline(
             val pm = context.packageManager
             val appInfo = pm.getApplicationInfo(pkg, 0)
             pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
+        } catch (_: PackageManager.NameNotFoundException) {
             pkg
         }
     }
