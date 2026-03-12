@@ -1,7 +1,6 @@
 package com.pause.app.service.webfilter.url
 
 import com.pause.app.data.repository.BlacklistRepository
-import com.pause.app.data.repository.WhitelistRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,16 +14,12 @@ enum class URLClassification {
 @Singleton
 class URLClassifier @Inject constructor(
     private val blacklistRepository: BlacklistRepository,
-    private val whitelistRepository: WhitelistRepository,
     private val keywordMatcher: KeywordMatcher
 ) {
 
     suspend fun classify(url: String, domain: String): Pair<URLClassification, KeywordMatch?> {
         val path = extractPath(url)
         val query = extractQuery(url)
-        if (whitelistRepository.isWhitelisted(domain)) {
-            return URLClassification.WHITELISTED to null
-        }
         if (blacklistRepository.isDomainBlacklisted(domain)) {
             return URLClassification.BLACKLISTED to null
         }
