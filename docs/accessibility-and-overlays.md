@@ -1,12 +1,12 @@
 # Accessibility Service and Overlay Manager
 
-This document describes how Pause uses the Android Accessibility Service for foreground app detection and interception, and how the OverlayManager presents delay, reflection, block, and other overlays.
+This document describes how Focus uses the Android Accessibility Service for foreground app detection and interception, and how the OverlayManager presents delay, reflection, block, and other overlays.
 
 ---
 
 ## 1. PauseAccessibilityService — Role and Constraints
 
-- **Declared in** `AndroidManifest.xml` and `res/xml/accessibility_service_config.xml`. The service is bound when the user enables “Pause” under Settings → Accessibility.
+- **Declared in** `AndroidManifest.xml` and `res/xml/accessibility_service_config.xml`. The service is bound when the user enables “Focus” under Settings → Accessibility.
 - **Purpose:**
   - Detect when the **foreground app** changes (`TYPE_WINDOW_STATE_CHANGED`).
   - Optionally read **URL bar text** in supported browsers when Web Filter URL capture is enabled (`TYPE_WINDOW_CONTENT_CHANGED`).
@@ -26,7 +26,7 @@ Handled in `handleWindowStateChanged(event)`:
    - If `event.packageName` equals the last known foreground package, the event is ignored.
 
 2. **Excluded and launcher packages**  
-   - System UI, launchers, Settings, package installer, and the Pause app itself are excluded. For these, `overlayManager.dismiss()` is called and the handler returns.
+   - System UI, launchers, Settings, package installer, and the Focus app itself are excluded. For these, `overlayManager.dismiss()` is called and the handler returns.
 
 3. **InterceptionPipeline.evaluate(pkg)**  
    - The pipeline runs four stages in order; the first that handles the package returns true and stops:
@@ -36,7 +36,7 @@ Handled in `handleWindowStateChanged(event)`:
      - **Standard** — If the package is in the monitored apps list: allowance exhausted → `AllowanceReachedOverlayView`; launch limit reached → `LaunchLimitOverlayView`; otherwise → reflection (when friction is MEDIUM/HIGH or a focus session is active) then delay overlay, or delay only.
    - If no stage handles the package, `overlayManager.dismiss()` is called.
 
-**Unlock detection (lock screen intervention)** — Uses `ACTION_USER_PRESENT` broadcast via `userPresentReceiver` (registered in `onServiceConnected`). When the user unlocks the device, the app records the unlock. If ≥5 unlocks occurred in the last 15 minutes, it shows the lock intervention overlay. Otherwise, it shows **GentleReentryOverlayView** — a brief “Pause. Breathe.” overlay for low unlock counts.
+**Unlock detection (lock screen intervention)** — Uses `ACTION_USER_PRESENT` broadcast via `userPresentReceiver` (registered in `onServiceConnected`). When the user unlocks the device, the app records the unlock. If ≥5 unlocks occurred in the last 15 minutes, it shows the lock intervention overlay.
 
 All overlay calls are done via **OverlayManager**. Coroutines are launched on a `serviceScope` (Main + SupervisorJob) so that repository and preference reads are async-safe.
 
@@ -68,7 +68,7 @@ Details of URL classification and VPN enforcement are in [webfilter.md](webfilte
 | State | Priority | View / Behavior |
 |-------|----------|------------------|
 | `IDLE` | 0 | No overlay |
-| `SHOWING_GENTLE_REENTRY` | 5 | GentleReentryOverlayView — brief “Pause. Breathe.” on unlock when count &lt; 5 |
+| `SHOWING_GENTLE_REENTRY` | 5 | GentleReentryOverlayView — brief “Focus. Breathe.” on unlock when count &lt; 5 |
 | `SHOWING_SCHEDULE_RESUME` | 10 | Schedule band change notification |
 | `SHOWING_SESSION_RESUME` | 10 | Session resume notification |
 | `SHOWING_SESSION_COMPLETE` | 10 | Session complete notification |
