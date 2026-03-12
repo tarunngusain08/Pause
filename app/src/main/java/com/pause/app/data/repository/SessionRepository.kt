@@ -17,8 +17,6 @@ class SessionRepository @Inject constructor(
 
     fun getActiveFocusSessionFlow(): Flow<Session?> = sessionDao.getActiveFocusSessionFlow()
 
-    fun getActiveCommitmentSessionFlow(): Flow<Session?> = sessionDao.getActiveCommitmentSessionFlow()
-
     suspend fun insertSession(session: Session): Long = sessionDao.insert(session)
 
     suspend fun updateSession(session: Session) = sessionDao.update(session)
@@ -55,47 +53,5 @@ class SessionRepository @Inject constructor(
             return null
         }
         return session
-    }
-
-    /**
-     * Returns the active commitment session, or null if none exists or the session has expired.
-     * NOTE: intentionally marks expired sessions as inactive as a lazy expiry mechanism;
-     * callers should be aware this is a read-with-side-effect.
-     */
-    suspend fun getActiveCommitmentSession(): Session? {
-        val session = sessionDao.getActiveCommitmentSession() ?: return null
-        if (System.currentTimeMillis() >= session.endsAt) {
-            sessionDao.markInactive(session.id)
-            return null
-        }
-        return session
-    }
-
-    suspend fun startCommitmentSession(durationMinutes: Int, packageNames: List<String>): Long {
-        val now = System.currentTimeMillis()
-        val endsAt = now + durationMinutes * 60 * 1000L
-        val blockedJson = org.json.JSONArray().apply { packageNames.forEach { put(it) } }.toString()
-        val session = Session(
-            sessionType = Session.SessionType.COMMITMENT,
-            startedAt = now,
-            endsAt = endsAt,
-            isActive = true,
-            blockedPackages = blockedJson
-        )
-        return sessionDao.insert(session)
-    }
-
-    fun isPackageInCommitmentBlockList(session: Session, packageName: String): Boolean {
-        val json = session.blockedPackages
-        return packageName in parseBlockedPackages(json)
-    }
-
-    private fun parseBlockedPackages(json: String): List<String> {
-        return try {
-            val arr = org.json.JSONArray(json)
-            (0 until arr.length()).map { arr.getString(it) }.filter { it.isNotBlank() }
-        } catch (_: Exception) {
-            emptyList()
-        }
     }
 }
