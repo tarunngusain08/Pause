@@ -16,7 +16,6 @@
 - **Commitment Mode** — Full block on selected apps for a set duration, with 90s cooldown to break
 - **Streaks & shields** — Day valid if limits respected; optional grace day per week
 - **Lock screen intervention** — Awareness overlay after repeated unlocks (e.g. 5 in 15 min); gentle “Focus. Breathe.” overlay on lower unlock counts
-- **Weekly & monthly insights** — Local aggregation only (no cloud)
 - **Accountability partner** — Daily summary sent via device SMS (user taps send)
 
 ### Strict Mode
@@ -32,8 +31,7 @@
   - **VPN DNS filtering** — Block domains for all browsers and apps (local VPN, no remote server)  
   - **Domain blacklist** — Manual + category bundles + auto‑blacklist from keyword matches  
   - **Keyword filter** — Match URL bar text (Accessibility), add domain to blacklist; VPN enforces  
-  - **Whitelist** — Override blocked domains  
-  - **URL visit log** — Parent reviews visited domains; child can request unblock from block page  
+  - **Block page** — Custom block page when domains are blocked; child can request unblock  
 
 ---
 
@@ -59,11 +57,11 @@ app/src/main/java/com/pause/app/
 ├── di/                           # Hilt modules, entry points (AS, VPN, Boot)
 ├── data/
 │   ├── db/                       # Room DB, entities, DAOs, type converters
-│   └── repository/               # Blacklist, Whitelist, Keyword, Insights, Session, etc.
+│   └── repository/               # Blacklist, Keyword, Insights, Session, etc.
 ├── service/
 │   ├── PauseAccessibilityService.kt  # Foreground detection, URL capture; delegates to InterceptionPipeline
-│   ├── InterceptionPipeline.kt      # Strict → Commitment → Parental → Standard interception stages
-│   ├── overlay/                  # OverlayManager, Delay/Reflection/Commitment/Strict/Lock overlays
+│   ├── InterceptionPipeline.kt      # Strict → Content Shield interception stages
+│   ├── overlay/                  # OverlayManager, Strict/Lock/ContentShield overlays
 │   └── webfilter/                # PauseVpnService, DNSPacketParser, BlocklistMatcher, etc.
 │       └── url/                  # BrowserURLReader, URLClassifier, KeywordMatcher, URLCaptureQueue
 ├── receiver/                     # BootReceiver (restart VPN / restore state)
@@ -93,10 +91,9 @@ Or open the project in Android Studio and run the **app** configuration.
 
 ### Permissions (granted in onboarding)
 
-- **Accessibility Service** — Foreground app detection; no screen content reading except URL bar text when Web Filter URL capture is enabled.
-- **Display over other apps** — Show delay/reflection/block overlays.
-- **Usage access** — Daily allowance and time‑in‑app (optional).
-- **VPN** (optional) — For Web Filter; local only, no traffic sent off‑device.
+- **Accessibility Service** — Foreground app detection; no screen content reading except URL bar text when Content Shield URL capture is enabled.
+- **Display over other apps** — Show Focus Mode and Content Shield block overlays.
+- **VPN** (optional) — For Content Shield; local only, no traffic sent off‑device.
 
 ---
 
