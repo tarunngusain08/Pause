@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import com.pause.app.di.PauseAccessibilityEntryPoint
@@ -30,6 +31,8 @@ class PauseAccessibilityService : AccessibilityService() {
     private lateinit var appEntryPoint: PauseAccessibilityEntryPoint
     private lateinit var pipeline: InterceptionPipeline
 
+    private val dynamicExcludedPackages = mutableSetOf<String>()
+
     private val userPresentReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != Intent.ACTION_USER_PRESENT) return
@@ -40,9 +43,6 @@ class PauseAccessibilityService : AccessibilityService() {
                 val count = insights.getUnlockCountSince(fifteenMinAgo)
                 if (count >= 5) {
                     overlayManager.showLockInterventionOverlay(count)
-                } else {
-                    // Gentle re-entry: brief mindful pause on low unlock counts
-                    overlayManager.showGentleReentryOverlay()
                 }
             }
         }
@@ -55,10 +55,15 @@ class PauseAccessibilityService : AccessibilityService() {
             PauseAccessibilityEntryPoint::class.java
         )
         overlayManager = appEntryPoint.getOverlayManager()
+        val launcherPkg = packageManager.resolveActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+            PackageManager.MATCH_DEFAULT_ONLY
+        )?.activityInfo?.packageName
+        if (launcherPkg != null) dynamicExcludedPackages.add(launcherPkg)
+
         pipeline = InterceptionPipeline(
             overlayManager = overlayManager,
             appEntryPoint = appEntryPoint,
-            serviceScope = serviceScope,
             isForeground = { pkg -> _foregroundPackage.value == pkg },
             context = applicationContext
         )
@@ -72,7 +77,8 @@ class PauseAccessibilityService : AccessibilityService() {
         // Block recents tray when a strict block overlay is active
         if (event?.keyCode == KeyEvent.KEYCODE_APP_SWITCH && event.action == KeyEvent.ACTION_DOWN) {
             val state = overlayManager.getState()
-            if (state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK) {
+            if (state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK ||
+                state == com.pause.app.service.overlay.OverlayState.SHOWING_CONTENT_SHIELD_BLOCK) {
                 performGlobalAction(GLOBAL_ACTION_HOME)
                 return true
             }
@@ -106,6 +112,7 @@ class PauseAccessibilityService : AccessibilityService() {
         _foregroundPackage.value = packageName
 
         if (isExcludedPackage(packageName) || isLauncherPackage(packageName)) {
+            overlayManager.dismissBlockIfAllowed()
             overlayManager.dismiss()
             return
         }
@@ -144,16 +151,22 @@ class PauseAccessibilityService : AccessibilityService() {
                 appEntryPoint.getAutoBlacklistEngine()
                     .onKeywordMatch(domain, keywordMatch.keyword, rawUrl)
             }
+            if (classification == URLClassification.BLACKLISTED ||
+                classification == URLClassification.KEYWORD_MATCH
+            ) {
+                overlayManager.showContentShieldBlockOverlay(domain)
+            }
         }
     }
 
     private fun isExcludedPackage(packageName: String): Boolean {
         if (packageName == applicationContext.packageName) return true
+        if (packageName in dynamicExcludedPackages) return true
         return packageName in EXCLUDED_PACKAGES
     }
 
     private fun isLauncherPackage(packageName: String): Boolean =
-        packageName in LAUNCHER_PACKAGES
+        packageName in dynamicExcludedPackages || packageName in LAUNCHER_PACKAGES
 
     override fun onInterrupt() {}
 
@@ -172,7 +185,6 @@ class PauseAccessibilityService : AccessibilityService() {
             "com.android.launcher3",
             "com.google.android.apps.nexuslauncher",
             "com.sec.android.app.launcher",
-            "com.android.settings",
             "com.android.packageinstaller"
         )
         private val LAUNCHER_PACKAGES = setOf(
