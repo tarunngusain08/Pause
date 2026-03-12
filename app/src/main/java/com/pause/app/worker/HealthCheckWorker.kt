@@ -82,7 +82,7 @@ class HealthCheckWorker @AssistedInject constructor(
         val nm = appContext.getSystemService(NotificationManager::class.java) ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Pause Health", NotificationManager.IMPORTANCE_HIGH)
+                NotificationChannel(CHANNEL_ID, "Focus Health", NotificationManager.IMPORTANCE_HIGH)
             )
         }
         val intent = Intent(appContext, MainActivity::class.java).apply {
@@ -95,7 +95,7 @@ class HealthCheckWorker @AssistedInject constructor(
         val body = issues.joinToString("\n")
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Pause needs attention")
+            .setContentTitle("Focus needs attention")
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pending)
