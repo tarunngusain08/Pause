@@ -24,4 +24,12 @@ class WebFilterConfigRepository @Inject constructor(
     suspend fun setVpnEnabled(enabled: Boolean) {
         webFilterConfigDao.ensureAndSetVpnEnabled(enabled)
     }
+
+    suspend fun setUrlReaderEnabled(enabled: Boolean) {
+        webFilterConfigDao.ensureAndSetUrlReaderEnabled(enabled)
+    }
+
+    suspend fun setKeywordFilterEnabled(enabled: Boolean) {
+        webFilterConfigDao.ensureAndSetKeywordFilterEnabled(enabled)
+    }
 }
