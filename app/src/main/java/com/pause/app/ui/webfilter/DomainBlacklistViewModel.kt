@@ -35,10 +35,12 @@ class DomainBlacklistViewModel @Inject constructor(
     fun loadDomains() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val domains = blacklistRepository.getActiveDomainsAsList()
-            val pending = blacklistRepository.getPendingReview()
+            val allDomains = blacklistRepository.getActiveDomainsAsList()
+            val allPending = blacklistRepository.getPendingReview()
+            val customDomains = allDomains.filter { it.source == "MANUAL" || it.source == "AUTO_KEYWORD" }
+            val customPending = allPending.filter { it.source == "MANUAL" || it.source == "AUTO_KEYWORD" }
             _uiState.update {
-                it.copy(domains = domains, pendingReview = pending, isLoading = false)
+                it.copy(domains = customDomains, pendingReview = customPending, isLoading = false)
             }
         }
     }
