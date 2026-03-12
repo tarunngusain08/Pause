@@ -1,5 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/ic_launcher_background" />
-    <item android:drawable="@drawable/ic_launcher_foreground" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Teal background -->
+    <path
+        android:fillColor="#3A7D8F"
+        android:pathData="M0,0 L48,0 L48,48 L0,48 Z" />
+
+    <!--
+        Semi-transparent ring, centered at (24,24).
+        Even-odd fill: outer circle r=13, inner circle r=10.
+    -->
+    <path
+        android:fillColor="#45FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M24,11 C16.82,11 11,16.82 11,24 C11,31.18 16.82,37 24,37
+            C31.18,37 37,31.18 37,24 C37,16.82 31.18,11 24,11 Z
+            M24,14 C29.523,14 34,18.477 34,24 C34,29.523 29.523,34 24,34
+            C18.477,34 14,29.523 14,24 C14,18.477 18.477,14 24,14 Z" />
+
+    <!-- Left pause bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+            M15,19 L15,29 Q15,33 19,33 L19,33 Q23,33 23,29 L23,19 Q23,15 19,15 L19,15 Q15,15 15,19 Z" />
+
+    <!-- Right pause bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+            M25,19 L25,29 Q25,33 29,33 L29,33 Q33,33 33,29 L33,19 Q33,15 29,15 L29,15 Q25,15 25,19 Z" />
+</vector>
