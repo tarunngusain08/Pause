@@ -18,7 +18,7 @@ class SessionCompleteOverlayView(
         val durationText: TextView = findViewById(R.id.session_complete_duration)
         val dismissButton: Button = findViewById(R.id.session_complete_dismiss)
 
-        setBackgroundColor(0xFFF0F4F8.toInt())
+        setBackgroundColor(0xFF1A1A2E.toInt())
         val hours = (durationMs / (1000 * 60 * 60)).toInt()
         val minutes = ((durationMs / (1000 * 60)) % 60).toInt()
         durationText.text = when {
