@@ -34,7 +34,7 @@ PauseAccessibilityService (TYPE_WINDOW_CONTENT_CHANGED)
 ## 2. PauseVpnService
 
 - **Extends** `VpnService`. Started via explicit intent with action `ACTION_START` or `ACTION_STOP` (e.g. from Parent Dashboard when Web Filter is toggled).
-- **Establishment:** Uses `VpnService.Builder`: address `10.0.0.1/32`, default route `0.0.0.0/0`, DNS server `10.0.0.1`, MTU 1500. **Excludes the Pause app** via `addDisallowedApplication(packageName)` to avoid recursive filtering.
+- **Establishment:** Uses `VpnService.Builder`: address `10.0.0.1/32`, default route `0.0.0.0/0`, DNS server `10.0.0.1`, MTU 1500. **Excludes the Focus app** via `addDisallowedApplication(packageName)` to avoid recursive filtering.
 - **Foreground:** Runs as a foreground service with a notification (“Web filtering active”) so the system is less likely to kill it.
 - **DNS loop:** Runs on a coroutine; reads and writes via `FileInputStream` and `FileOutputStream` on the same `vpnInterface.fileDescriptor`. TUN delivers **IPv4 packets**; the loop uses `DNSPacketParser.extractDnsInfo(packet)` to locate the UDP DNS payload, then `parseQuery(dnsPayload)` to get the queried domain. The decision:
   1. **WhitelistMatcher.isWhitelisted(domain)** → forward to upstream DNS; wrap the response with `wrapResponse()` and write back.
@@ -87,8 +87,8 @@ URL visit log and auto-blacklist are decoupled from the VPN packet path; the VPN
 
 ## 6. Block Page and Unblock Request
 
-- **Block page:** The VPN returns NXDOMAIN for blocked domains; the browser shows its own “site can’t be reached” / “ERR_NAME_NOT_RESOLVED” page. A `block_page.html` asset exists (`app/src/main/assets/block_page.html`) with “This site is blocked by Pause” and a “Request Review” link that deep-links to `pause://unblock-request?domain={domain}`. This asset is **not currently served** by a local HTTP server; a future implementation could use `buildRedirectResponse()` and a LocalHTTPServer to show the block page for HTTP requests.
-- **Unblock request:** The app’s deep link `pause://unblock-request?domain={domain}` opens **UnblockRequestScreen** with that domain. The child can add a note and submit; the app creates a **PendingReview**. The parent can approve (e.g. add domain to whitelist) or deny from the Parent Dashboard.
+- **Block page:** The VPN returns NXDOMAIN for blocked domains; the browser shows its own “site can’t be reached” / “ERR_NAME_NOT_RESOLVED” page. A `block_page.html` asset exists (`app/src/main/assets/block_page.html`) with “This site is blocked by Focus” and a “Request Review” link that deep-links to `focus://unblock-request?domain={domain}`. This asset is **not currently served** by a local HTTP server; a future implementation could use `buildRedirectResponse()` and a LocalHTTPServer to show the block page for HTTP requests.
+- **Unblock request:** The app’s deep link `focus://unblock-request?domain={domain}` opens **UnblockRequestScreen** with that domain. The child can add a note and submit; the app creates a **PendingReview**. The parent can approve (e.g. add domain to whitelist) or deny from the Parent Dashboard.
 
 ---
 
@@ -101,7 +101,7 @@ URL visit log and auto-blacklist are decoupled from the VPN packet path; the VPN
 
 ## 8. Boot and Lifecycle
 
-- **BootReceiver** — Handles `ACTION_BOOT_COMPLETED` and `LOCKED_BOOT_COMPLETED`. Uses `BootEntryPoint` to: (1) resume Strict session via `StrictSessionManager.resumeSessionOnBootSync()`, (2) resume Parental Control via `ParentalControlManager.resumeOnBootSync()`, (3) start `PauseVpnService` with `ACTION_START` if `WebFilterConfig.vpnEnabled` is true. Uses `goAsync()` so work completes before the receiver process is killed. On failure, posts a “Pause needs attention” notification.
+- **BootReceiver** — Handles `ACTION_BOOT_COMPLETED` and `LOCKED_BOOT_COMPLETED`. Uses `BootEntryPoint` to: (1) resume Strict session via `StrictSessionManager.resumeSessionOnBootSync()`, (2) resume Parental Control via `ParentalControlManager.resumeOnBootSync()`, (3) start `PauseVpnService` with `ACTION_START` if `WebFilterConfig.vpnEnabled` is true. Uses `goAsync()` so work completes before the receiver process is killed. On failure, posts a “Focus needs attention” notification.
 - **onRevoke** — When the user revokes VPN permission, `PauseVpnService.onRevoke()` stops the VPN and releases the TUN interface.
 
 For full feature specs, data flows, and sequence diagrams, see [PRDv3.md](PRDv3.md). For repository and DB schema, see [data-layer.md](data-layer.md).
