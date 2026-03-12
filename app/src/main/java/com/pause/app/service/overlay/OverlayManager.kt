@@ -29,6 +29,10 @@ class OverlayManager @Inject constructor(
     fun getState(): OverlayState = currentState
 
     @MainThread
+    private fun hasOverlayPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+
+    @MainThread
     private fun canShow(newState: OverlayState): Boolean {
         if (newState.isInformational) return currentState == OverlayState.IDLE
         if (newState.priority > currentState.priority) {
@@ -57,9 +61,6 @@ class OverlayManager @Inject constructor(
         if (currentState == OverlayState.SHOWING_STRICT_BLOCK ||
             currentState == OverlayState.SHOWING_CONTENT_SHIELD_BLOCK
         ) {
-            if (currentState == OverlayState.SHOWING_CONTENT_SHIELD_BLOCK) {
-                navigateHome()
-            }
             dismissOverlay()
         }
     }
@@ -73,7 +74,7 @@ class OverlayManager @Inject constructor(
         if (!canShow(OverlayState.SHOWING_STRICT_BLOCK) &&
             currentState != OverlayState.SHOWING_STRICT_BLOCK
         ) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         dismissOverlay()
         currentState = OverlayState.SHOWING_STRICT_BLOCK
@@ -96,12 +97,13 @@ class OverlayManager @Inject constructor(
             }
         )
         addOverlayToWindow(overlay)
+        navigateHome()
     }
 
     @MainThread
     fun showPowerMenuBlockOverlay(remainingMs: Long) {
         if (!canShow(OverlayState.SHOWING_POWER_BLOCK)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_POWER_BLOCK
         val overlay = PowerMenuBlockOverlayView(context, remainingMs) { dismissOverlay() }
@@ -111,7 +113,7 @@ class OverlayManager @Inject constructor(
     @MainThread
     fun showSessionResumeOverlay(remainingMs: Long) {
         if (!canShow(OverlayState.SHOWING_SESSION_RESUME)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_SESSION_RESUME
         val overlay = SessionResumeOverlayView(context, remainingMs) { dismissOverlay() }
@@ -121,7 +123,7 @@ class OverlayManager @Inject constructor(
     @MainThread
     fun showSessionCompleteOverlay(durationMs: Long) {
         if (!canShow(OverlayState.SHOWING_SESSION_COMPLETE)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_SESSION_COMPLETE
         val overlay = SessionCompleteOverlayView(context, durationMs) { dismissOverlay() }
@@ -131,7 +133,7 @@ class OverlayManager @Inject constructor(
     @MainThread
     fun showEmergencyConfirmOverlay(onConfirm: () -> Unit, onCancel: () -> Unit) {
         if (!canShow(OverlayState.SHOWING_EMERGENCY_CONFIRM)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_EMERGENCY_CONFIRM
         val overlay = EmergencyConfirmOverlayView(context, onConfirm, onCancel)
@@ -149,7 +151,7 @@ class OverlayManager @Inject constructor(
         if (!canShow(OverlayState.SHOWING_PARENTAL_BLOCK) &&
             currentState != OverlayState.SHOWING_PARENTAL_BLOCK
         ) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         dismissOverlay()
         currentState = OverlayState.SHOWING_PARENTAL_BLOCK
@@ -171,7 +173,7 @@ class OverlayManager @Inject constructor(
         onPinAttempt: ((String, (String?) -> Unit) -> Unit)? = null
     ) {
         if (!canShow(OverlayState.SHOWING_PIN_ENTRY)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_PIN_ENTRY
         var pinOverlayRef: PINEntryOverlayView? = null
@@ -203,7 +205,7 @@ class OverlayManager @Inject constructor(
         if (!canShow(OverlayState.SHOWING_CONTENT_SHIELD_BLOCK) &&
             currentState != OverlayState.SHOWING_CONTENT_SHIELD_BLOCK
         ) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         dismissOverlay()
         currentState = OverlayState.SHOWING_CONTENT_SHIELD_BLOCK
@@ -211,17 +213,18 @@ class OverlayManager @Inject constructor(
             context = context,
             appName = appName,
             onGoHome = {
-                navigateHome()
                 dismissOverlay()
+                navigateHome()
             }
         )
         addOverlayToWindow(overlay)
+        navigateHome()
     }
 
     @MainThread
     fun showLockInterventionOverlay(unlockCount: Int) {
         if (!canShow(OverlayState.SHOWING_LOCK_INTERVENTION)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_LOCK_INTERVENTION
         val overlay = LockInterventionOverlayView(
@@ -238,7 +241,7 @@ class OverlayManager @Inject constructor(
     @MainThread
     fun showScheduleResumeOverlay(currentBand: String, nextChange: String) {
         if (!canShow(OverlayState.SHOWING_SCHEDULE_RESUME)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!hasOverlayPermission()) return
 
         currentState = OverlayState.SHOWING_SCHEDULE_RESUME
         val overlay = ScheduleResumeOverlayView(
@@ -253,15 +256,32 @@ class OverlayManager @Inject constructor(
     @MainThread
     private fun addOverlayToWindow(overlay: View) {
         val isBlockOverlay = currentState in BLOCK_OVERLAY_STATES
+        val isStrictBlock = currentState == OverlayState.SHOWING_STRICT_BLOCK
         val needsFocus = currentState == OverlayState.SHOWING_PIN_ENTRY
-        var flags = if (needsFocus) {
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-        } else {
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        var flags = when {
+            needsFocus -> {
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            }
+            isStrictBlock -> {
+                // Fully modal: capture all touch events so nothing behind can be tapped.
+                // FLAG_SHOW_WHEN_LOCKED / FLAG_TURN_SCREEN_ON are deprecated API 27+ but the
+                // Window-level alternatives only apply to Activities, not system overlays.
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_SECURE or
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            }
+            else -> {
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            }
         }
-        if (isBlockOverlay) {
+        if (isBlockOverlay && !isStrictBlock) {
             flags = flags or WindowManager.LayoutParams.FLAG_SECURE
         }
         val params = WindowManager.LayoutParams(
@@ -294,6 +314,7 @@ class OverlayManager @Inject constructor(
                 windowManager.removeView(overlay)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to remove overlay view", e)
+                overlay.visibility = View.GONE
             }
             currentOverlay = null
         }
