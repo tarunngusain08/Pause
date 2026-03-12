@@ -6,4 +6,11 @@
     <string name="strict_mode_notification_title">Focus Mode active</string>
     <string name="web_filter_channel">Web Filter</string>
     <string name="lock_intervention_message">You\'ve unlocked your phone %d times in the last 15 minutes.</string>
+    <string name="strict_block_focus_active">Focus Mode Active</string>
+    <string name="strict_block_app_blocked">App is blocked</string>
+    <string name="strict_block_remaining_default">0:00 remaining</string>
+    <string name="strict_block_dots_default">○ ○ ○</string>
+    <string name="strict_block_go_home">Go to Home</string>
+    <string name="strict_block_emergency">Emergency Exit ×3</string>
+    <string name="strict_block_lock_icon_desc">Focus mode lock</string>
 </resources>
