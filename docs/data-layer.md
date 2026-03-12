@@ -1,6 +1,6 @@
 # Data Layer — Room, Repositories, DAOs
 
-Pause stores all app and web-filter data locally using **Room** (SQLite). Repositories wrap DAOs and expose Kotlin Flow or suspend APIs to the rest of the app. This document summarizes the schema, DAOs, and repository roles.
+Focus stores all app and web-filter data locally using **Room** (SQLite). Repositories wrap DAOs and expose Kotlin Flow or suspend APIs to the rest of the app. This document summarizes the schema, DAOs, and repository roles.
 
 ---
 
