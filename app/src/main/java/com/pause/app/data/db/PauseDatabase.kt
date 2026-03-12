@@ -20,7 +20,6 @@ import com.pause.app.data.db.dao.StreakDao
 import com.pause.app.data.db.dao.UnlockEventDao
 import com.pause.app.data.db.dao.UrlVisitLogDao
 import com.pause.app.data.db.dao.WebFilterConfigDao
-import com.pause.app.data.db.dao.WhitelistedDomainDao
 import com.pause.app.data.db.entity.Accountability
 import com.pause.app.data.db.entity.BlacklistedDomain
 import com.pause.app.data.db.entity.KeywordEntry
@@ -38,7 +37,6 @@ import com.pause.app.data.db.entity.Streak
 import com.pause.app.data.db.entity.UnlockEvent
 import com.pause.app.data.db.entity.UrlVisitLog
 import com.pause.app.data.db.entity.WebFilterConfig
-import com.pause.app.data.db.entity.WhitelistedDomain
 
 @Database(
     entities = [
@@ -55,13 +53,12 @@ import com.pause.app.data.db.entity.WhitelistedDomain
         ParentalBlockedApp::class,
         PINAuditLog::class,
         BlacklistedDomain::class,
-        WhitelistedDomain::class,
         KeywordEntry::class,
         UrlVisitLog::class,
         PendingReview::class,
         WebFilterConfig::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -80,7 +77,6 @@ abstract class PauseDatabase : RoomDatabase() {
     abstract fun parentalBlockedAppDao(): ParentalBlockedAppDao
     abstract fun pinAuditLogDao(): PINAuditLogDao
     abstract fun blacklistedDomainDao(): BlacklistedDomainDao
-    abstract fun whitelistedDomainDao(): WhitelistedDomainDao
     abstract fun keywordDao(): KeywordDao
     abstract fun urlVisitLogDao(): UrlVisitLogDao
     abstract fun pendingReviewDao(): PendingReviewDao
