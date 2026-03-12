@@ -1,6 +1,7 @@
 package com.pause.app.ui.home
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.core.EaseInOut
@@ -9,9 +10,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,22 +25,22 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -54,15 +58,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pause.app.ui.common.rememberAppIcon
 import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
     onNavigateToStrictSetup: () -> Unit = {},
-    onNavigateToContentShield: () -> Unit = {},
+    onNavigateToSocialFilter: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val strictSession by viewModel.strictSession.collectAsState(initial = null)
+    val strictSession by viewModel.strictSession.collectAsStateWithLifecycle(initialValue = null)
     val permissionStatus by viewModel.permissionStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -94,15 +99,15 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    if (strictSession != null && strictRemainingMs > 0) {
-        val totalDurationMs = (
-            (strictSession?.endsAt ?: 0L) - (strictSession?.startedAt ?: 0L)
-            ).coerceAtLeast(1L)
-        FocusModeActiveScreen(
-            remainingMs = strictRemainingMs,
-            totalDurationMs = totalDurationMs
-        )
-        return
+    strictSession?.let { session ->
+        if (strictRemainingMs > 0) {
+            val totalDurationMs = (session.endsAt - session.startedAt).coerceAtLeast(1L)
+            FocusModeActiveScreen(
+                remainingMs = strictRemainingMs,
+                totalDurationMs = totalDurationMs
+            )
+            return
+        }
     }
 
     if (!permissionStatus.allGranted && !permissionDialogDismissed) {
@@ -131,8 +136,17 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(24.dp)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Icon(
+            imageVector = Icons.Filled.Timer,
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "Focus",
             style = MaterialTheme.typography.headlineLarge,
@@ -140,31 +154,69 @@ fun HomeScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Use Focus Mode and Content Shield to stay intentional.",
+            text = "Use Focus Mode and Social Media Filter to stay intentional.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            ElevatedCard(
                 onClick = onNavigateToStrictSetup,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Focus Mode")
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Focus Mode",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Block distracting apps for a set duration.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            OutlinedButton(
-                onClick = onNavigateToContentShield,
-                modifier = Modifier.fillMaxWidth()
+            ElevatedCard(
+                onClick = onNavigateToSocialFilter,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
-                Text("Content Shield")
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Social Media Filter",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Block social media apps from being accessed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -197,7 +249,10 @@ private fun FocusModeActiveScreen(
         "Keep going. Discomfort now, clarity later."
     )
     val motivation = motivationMessages[((remainingMs / 15_000L) % motivationMessages.size).toInt()]
-    val allowedApps = listOf("Dialer", "Camera", "Clock", "Calculator", "Contacts")
+    val context = LocalContext.current
+    val allowedApps = remember {
+        resolveInstalledAllowedApps(context.packageManager)
+    }
 
     Column(
         modifier = Modifier
@@ -256,18 +311,42 @@ private fun FocusModeActiveScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
-            allowedApps.forEach { app ->
-                Text(
-                    text = "- $app",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            allowedApps.forEach { (pkg, appName) ->
+                AllowedAppRow(packageName = pkg, appName = appName)
             }
         }
         Text(
             text = "Triple-tap the emergency button on the block screen to exit early",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AllowedAppRow(packageName: String, appName: String) {
+    val iconBitmap = rememberAppIcon(packageName)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (iconBitmap != null) {
+            Image(
+                bitmap = iconBitmap,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            Spacer(modifier = Modifier.size(28.dp))
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = appName,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -363,6 +442,31 @@ private fun PermissionRow(
                 contentPadding = PaddingValues(0.dp)
             ) {
                 Text(actionLabel, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+/**
+ * Resolves the allowed apps for Focus Mode from the device's installed packages.
+ * Tries each canonical package name variant and returns the first installed one per role.
+ */
+internal fun resolveInstalledAllowedApps(pm: PackageManager): List<Pair<String, String>> {
+    val candidates = listOf(
+        listOf("com.google.android.dialer", "com.android.dialer"),
+        listOf("com.google.android.contacts", "com.android.contacts"),
+        listOf("com.google.android.deskclock", "com.android.deskclock"),
+        listOf("com.android.camera2", "com.android.camera"),
+        listOf("com.google.android.calculator", "com.android.calculator2"),
+        listOf("com.android.emergency")
+    )
+    return candidates.mapNotNull { variants ->
+        variants.firstNotNullOfOrNull { pkg ->
+            try {
+                val info = pm.getApplicationInfo(pkg, 0)
+                Pair(pkg, pm.getApplicationLabel(info).toString())
+            } catch (_: PackageManager.NameNotFoundException) {
+                null
             }
         }
     }
