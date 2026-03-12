@@ -23,6 +23,12 @@ interface WebFilterConfigDao {
     @Query("UPDATE web_filter_config SET vpn_enabled = :enabled WHERE id = 1")
     suspend fun setVpnEnabled(enabled: Boolean)
 
+    @Query("UPDATE web_filter_config SET url_reader_enabled = :enabled WHERE id = 1")
+    suspend fun setUrlReaderEnabled(enabled: Boolean)
+
+    @Query("UPDATE web_filter_config SET keyword_filter_enabled = :enabled WHERE id = 1")
+    suspend fun setKeywordFilterEnabled(enabled: Boolean)
+
     /** Atomically ensures a default config row exists, then updates vpn_enabled. */
     @Transaction
     suspend fun ensureAndSetVpnEnabled(enabled: Boolean) {
@@ -30,5 +36,21 @@ interface WebFilterConfigDao {
             insertOrReplace(WebFilterConfig(id = 1))
         }
         setVpnEnabled(enabled)
+    }
+
+    @Transaction
+    suspend fun ensureAndSetUrlReaderEnabled(enabled: Boolean) {
+        if (getConfig() == null) {
+            insertOrReplace(WebFilterConfig(id = 1))
+        }
+        setUrlReaderEnabled(enabled)
+    }
+
+    @Transaction
+    suspend fun ensureAndSetKeywordFilterEnabled(enabled: Boolean) {
+        if (getConfig() == null) {
+            insertOrReplace(WebFilterConfig(id = 1))
+        }
+        setKeywordFilterEnabled(enabled)
     }
 }
