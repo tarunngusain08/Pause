@@ -49,7 +49,7 @@ class PauseVpnService : VpnService() {
     private fun startVpn() {
         if (vpnInterface != null) return
         val config = Builder()
-            .setSession("Pause Web Filter")
+            .setSession("Focus Web Filter")
             .addAddress("10.0.0.1", 32)
             .addRoute("0.0.0.0", 0)
             .addDnsServer("10.0.0.1")
@@ -91,7 +91,12 @@ class PauseVpnService : VpnService() {
                                         line = reader.readLine()
                                     }
                                     val domain = host
-                                    val html = buildBlockPage(domain)
+                                    val safeDomain = domain
+                                        .replace("&", "&amp;")
+                                        .replace("<", "&lt;")
+                                        .replace(">", "&gt;")
+                                        .replace("\"", "&quot;")
+                                    val html = buildBlockPage(safeDomain)
                                     val response = buildString {
                                         append("HTTP/1.1 200 OK\r\n")
                                         append("Content-Type: text/html; charset=utf-8\r\n")
@@ -115,14 +120,14 @@ class PauseVpnService : VpnService() {
     private fun buildBlockPage(domain: String): String = """
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>Blocked by Pause</title>
+        <head><meta charset="utf-8"><title>Blocked by Focus</title>
         <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;
         height:100vh;margin:0;background:#1a1a2e;}
         .card{background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:400px;}
         h1{color:#e74c3c}p{color:#555}</style></head>
         <body><div class="card">
         <h1>Blocked</h1>
-        <p><strong>$domain</strong> is blocked by Pause Web Filter.</p>
+        <p><strong>$domain</strong> is blocked by Focus Web Filter.</p>
         <p>This site has been blocked to help you stay focused.</p>
         </div></body>
         </html>
@@ -132,7 +137,6 @@ class PauseVpnService : VpnService() {
         val vpnFd = vpnInterface ?: return
         val entryPoint = EntryPointAccessors.fromApplication(this, VpnEntryPoint::class.java)
         val blocklistMatcher = entryPoint.getBlocklistMatcher()
-        val whitelistMatcher = entryPoint.getWhitelistMatcher()
         val configRepo = entryPoint.getWebFilterConfigRepository()
 
         var config = configRepo.getConfig()
@@ -176,8 +180,6 @@ class PauseVpnService : VpnService() {
                             val domain = query.question
                             val upstream = cfg.upstreamDns.ifBlank { "8.8.8.8" }
                             val dnsResponse: ByteArray = when {
-                                whitelistMatcher.isWhitelisted(domain) ->
-                                    resolveUpstream(upstream, dnsPayload) ?: continue
                                 blocklistMatcher.isBlocked(domain) ->
                                     DNSPacketParser.buildRedirectResponse(query, BLOCK_PAGE_HOST)
                                 else ->
@@ -233,7 +235,7 @@ class PauseVpnService : VpnService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Pause Web Filter")
+            .setContentTitle("Focus Web Filter")
             .setContentText("Web filtering active")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pending)
@@ -259,7 +261,7 @@ class PauseVpnService : VpnService() {
         private const val TAG = "PauseVpnService"
         const val HEARTBEAT_PREFS = "vpn_heartbeat"
         const val KEY_LAST_HEARTBEAT = "vpn_last_heartbeat"
-        const val BLOCK_PAGE_PORT = 8080
+        const val BLOCK_PAGE_PORT = 80
         private const val BLOCK_PAGE_HOST = "127.0.0.1"
     }
 }
