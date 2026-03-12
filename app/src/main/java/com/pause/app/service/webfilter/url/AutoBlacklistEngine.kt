@@ -5,7 +5,6 @@ import com.pause.app.data.db.entity.BlacklistedDomain
 import com.pause.app.data.db.entity.PendingReview
 import com.pause.app.data.repository.BlacklistRepository
 import com.pause.app.data.repository.WebFilterConfigRepository
-import com.pause.app.service.webfilter.BlocklistMatcher
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,11 +12,10 @@ import javax.inject.Singleton
 class AutoBlacklistEngine @Inject constructor(
     private val blacklistRepository: BlacklistRepository,
     private val webFilterConfigRepository: WebFilterConfigRepository,
-    private val blocklistMatcher: BlocklistMatcher,
     private val pendingReviewDao: PendingReviewDao
 ) {
 
-    suspend fun onKeywordMatch(domain: String, keyword: String, url: String) {
+    suspend fun onKeywordMatch(domain: String, keyword: String) {
         val config = webFilterConfigRepository.getConfig() ?: return
         if (!config.autoBlacklistOnKeywordMatch) return
 
@@ -35,7 +33,6 @@ class AutoBlacklistEngine @Inject constructor(
                 pendingParentReview = true
             )
         )
-        blocklistMatcher.reloadFromDB()
 
         pendingReviewDao.insert(
             PendingReview(
