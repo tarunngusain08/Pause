@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -88,6 +89,30 @@ class PreferencesManager @Inject constructor(
         dataStore.edit { it.remove(KEY_PARENTAL_SETUP_STEP) }
     }
 
+    val adultFilterEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_ADULT_FILTER_ENABLED] ?: false
+    }
+
+    val socialMediaFilterEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_SOCIAL_MEDIA_FILTER_ENABLED] ?: false
+    }
+
+    suspend fun setAdultFilterEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_ADULT_FILTER_ENABLED] = enabled }
+    }
+
+    suspend fun setSocialMediaFilterEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_SOCIAL_MEDIA_FILTER_ENABLED] = enabled }
+    }
+
+    val excludedSocialMediaPackages: Flow<Set<String>> = dataStore.data.map { prefs ->
+        prefs[KEY_EXCLUDED_SOCIAL_PACKAGES] ?: setOf("com.whatsapp")
+    }
+
+    suspend fun setExcludedSocialMediaPackages(packages: Set<String>) {
+        dataStore.edit { it[KEY_EXCLUDED_SOCIAL_PACKAGES] = packages }
+    }
+
     // anyStrictActive and parentalActive are managed by SessionPreferences (device-protected
     // SharedPreferences). Do not add duplicate keys here to avoid two sources of truth.
 
@@ -137,6 +162,9 @@ class PreferencesManager @Inject constructor(
         private val KEY_PIN_ATTEMPT_COUNT = intPreferencesKey("pin_attempt_count")
         private val KEY_PIN_LOCKOUT_UNTIL = longPreferencesKey("pin_lockout_until")
         private val KEY_PARENTAL_SETUP_STEP = intPreferencesKey("parental_setup_step")
+        private val KEY_ADULT_FILTER_ENABLED = booleanPreferencesKey("adult_filter_enabled")
+        private val KEY_SOCIAL_MEDIA_FILTER_ENABLED = booleanPreferencesKey("social_media_filter_enabled")
+        private val KEY_EXCLUDED_SOCIAL_PACKAGES = stringSetPreferencesKey("excluded_social_packages")
 
         const val DEFAULT_DELAY_SECONDS = 10
         const val DEFAULT_PHASE = 2
