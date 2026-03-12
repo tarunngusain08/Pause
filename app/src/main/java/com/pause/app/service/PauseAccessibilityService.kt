@@ -18,14 +18,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.MutableStateFlow
 
 class PauseAccessibilityService : AccessibilityService() {
 
-    private val _foregroundPackage = MutableStateFlow<String?>(null)
+    @Volatile
+    private var foregroundPackage: String? = null
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val lastExtractTime = mutableMapOf<String, Long>()
+    private val lastExtractTime = LinkedHashMap<String, Long>(16, 0.75f, true)
 
     private lateinit var overlayManager: OverlayManager
     private lateinit var appEntryPoint: PauseAccessibilityEntryPoint
@@ -64,8 +64,8 @@ class PauseAccessibilityService : AccessibilityService() {
         pipeline = InterceptionPipeline(
             overlayManager = overlayManager,
             appEntryPoint = appEntryPoint,
-            isForeground = { pkg -> _foregroundPackage.value == pkg },
-            context = applicationContext
+            context = applicationContext,
+            isForeground = { pkg -> foregroundPackage == pkg }
         )
         registerReceiver(userPresentReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
     }
@@ -79,6 +79,25 @@ class PauseAccessibilityService : AccessibilityService() {
             val state = overlayManager.getState()
             if (state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK ||
                 state == com.pause.app.service.overlay.OverlayState.SHOWING_CONTENT_SHIELD_BLOCK) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                return true
+            }
+        }
+
+        // Block back key when Content Shield or Strict Block overlay is active
+        if (event?.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+            val state = overlayManager.getState()
+            if (state == com.pause.app.service.overlay.OverlayState.SHOWING_CONTENT_SHIELD_BLOCK ||
+                state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK) {
+                return true
+            }
+        }
+
+        // When strict block overlay is showing, also suppress the Home key on devices where it
+        // is accessible via accessibility key events (not universal but helps on some OEMs).
+        if (event?.keyCode == KeyEvent.KEYCODE_HOME && event.action == KeyEvent.ACTION_DOWN) {
+            val state = overlayManager.getState()
+            if (state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK) {
                 performGlobalAction(GLOBAL_ACTION_HOME)
                 return true
             }
@@ -107,19 +126,37 @@ class PauseAccessibilityService : AccessibilityService() {
 
     private fun handleWindowStateChanged(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
-        if (packageName == _foregroundPackage.value) return
+        val state = overlayManager.getState()
+        val isBlockOverlayActive = state == com.pause.app.service.overlay.OverlayState.SHOWING_CONTENT_SHIELD_BLOCK ||
+            state == com.pause.app.service.overlay.OverlayState.SHOWING_STRICT_BLOCK
+        if (packageName == foregroundPackage && !isBlockOverlayActive) return
 
-        _foregroundPackage.value = packageName
+        foregroundPackage = packageName
 
-        if (isExcludedPackage(packageName) || isLauncherPackage(packageName)) {
+        if (isExcludedPackage(packageName)) {
             overlayManager.dismissBlockIfAllowed()
             overlayManager.dismiss()
             return
         }
 
-        val pkg = packageName
+        // When focus mode is active and the launcher comes to the foreground (Home button pressed),
+        // immediately bring MainActivity back to the front to prevent the user from escaping.
+        if (isLauncherPackage(packageName)) {
+            val strictSession = appEntryPoint.getStrictSessionManager().getActiveSession()
+            if (strictSession != null) {
+                val intent = Intent(applicationContext, com.pause.app.MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                applicationContext.startActivity(intent)
+                return
+            }
+            overlayManager.dismissBlockIfAllowed()
+            overlayManager.dismiss()
+            return
+        }
+
         serviceScope.launch {
-            pipeline.evaluate(pkg)
+            pipeline.evaluate(packageName)
         }
     }
 
@@ -129,6 +166,9 @@ class PauseAccessibilityService : AccessibilityService() {
         val now = System.currentTimeMillis()
         if (now - (lastExtractTime[packageName] ?: 0L) < CONTENT_CHANGED_DEBOUNCE_MS) return
         lastExtractTime[packageName] = now
+        if (lastExtractTime.size > MAX_EXTRACT_TIME_ENTRIES) {
+            lastExtractTime.remove(lastExtractTime.keys.first())
+        }
         val rootNode = rootInActiveWindow ?: return
         val rawUrl = try {
             appEntryPoint.getBrowserURLReader().extractURL(rootNode, packageName)
@@ -149,7 +189,7 @@ class PauseAccessibilityService : AccessibilityService() {
             )
             if (classification == URLClassification.KEYWORD_MATCH && keywordMatch != null) {
                 appEntryPoint.getAutoBlacklistEngine()
-                    .onKeywordMatch(domain, keywordMatch.keyword, rawUrl)
+                    .onKeywordMatch(domain, keywordMatch.keyword)
             }
             if (classification == URLClassification.BLACKLISTED ||
                 classification == URLClassification.KEYWORD_MATCH
@@ -178,20 +218,17 @@ class PauseAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val CONTENT_CHANGED_DEBOUNCE_MS = 500L
+        private const val MAX_EXTRACT_TIME_ENTRIES = 20
 
-        private val EXCLUDED_PACKAGES = setOf(
-            "com.android.systemui",
-            "com.android.launcher",
-            "com.android.launcher3",
-            "com.google.android.apps.nexuslauncher",
-            "com.sec.android.app.launcher",
-            "com.android.packageinstaller"
-        )
         private val LAUNCHER_PACKAGES = setOf(
             "com.android.launcher",
             "com.android.launcher3",
             "com.google.android.apps.nexuslauncher",
             "com.sec.android.app.launcher"
+        )
+        private val EXCLUDED_PACKAGES = LAUNCHER_PACKAGES + setOf(
+            "com.android.systemui",
+            "com.android.packageinstaller"
         )
     }
 }
