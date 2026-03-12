@@ -2,18 +2,40 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1A1A2E"
+    android:background="#EF1A1A2E"
+    android:clickable="true"
+    android:focusable="true"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="32dp">
+    android:padding="40dp">
+
+    <ImageView
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:alpha="0.9"
+        android:contentDescription="@string/strict_block_lock_icon_desc"
+        android:src="@drawable/ic_lock_focus" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:letterSpacing="0.15"
+        android:text="@string/strict_block_focus_active"
+        android:textAllCaps="true"
+        android:textColor="#AACCDD"
+        android:textSize="14sp" />
 
     <TextView
         android:id="@+id/strict_block_app_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="App is blocked"
-        android:textColor="#E0E0E0"
-        android:textSize="20sp"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:maxLines="2"
+        android:text="@string/strict_block_app_blocked"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
         android:textStyle="bold" />
 
     <TextView
@@ -21,36 +43,45 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="0:00 remaining"
+        android:text="@string/strict_block_remaining_default"
         android:textColor="#4A90A4"
-        android:textSize="24sp" />
+        android:textSize="20sp" />
+
+    <View
+        android:layout_width="48dp"
+        android:layout_height="1dp"
+        android:layout_marginTop="28dp"
+        android:background="#334A90A4" />
 
     <TextView
         android:id="@+id/strict_block_dots"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="○ ○ ○"
+        android:layout_marginTop="28dp"
+        android:letterSpacing="0.25"
+        android:text="@string/strict_block_dots_default"
         android:textColor="#4A90A4"
-        android:textSize="24sp"
-        android:letterSpacing="0.2" />
+        android:textSize="22sp" />
 
     <Button
         android:id="@+id/strict_block_go_back"
-        android:layout_width="wrap_content"
-        android:layout_height="48dp"
-        android:layout_marginTop="32dp"
-        android:text="Go Back"
-        android:textColor="#FFFFFF"
+        android:layout_width="200dp"
+        android:layout_height="52dp"
+        android:layout_marginTop="28dp"
         android:backgroundTint="#4A90A4"
-        android:paddingStart="32dp"
-        android:paddingEnd="32dp" />
+        android:letterSpacing="0.03"
+        android:text="@string/strict_block_go_home"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp" />
 
     <Button
         android:id="@+id/strict_block_emergency_button"
+        style="@android:style/Widget.Material.Button.Borderless"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Emergency Exit ×3"
-        android:textColor="#FFFFFF" />
+        android:layout_marginTop="12dp"
+        android:text="@string/strict_block_emergency"
+        android:textColor="#66FFFFFF"
+        android:textSize="13sp" />
+
 </LinearLayout>
