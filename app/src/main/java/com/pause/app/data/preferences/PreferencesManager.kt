@@ -89,16 +89,8 @@ class PreferencesManager @Inject constructor(
         dataStore.edit { it.remove(KEY_PARENTAL_SETUP_STEP) }
     }
 
-    val adultFilterEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[KEY_ADULT_FILTER_ENABLED] ?: false
-    }
-
     val socialMediaFilterEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEY_SOCIAL_MEDIA_FILTER_ENABLED] ?: false
-    }
-
-    suspend fun setAdultFilterEnabled(enabled: Boolean) {
-        dataStore.edit { it[KEY_ADULT_FILTER_ENABLED] = enabled }
     }
 
     suspend fun setSocialMediaFilterEnabled(enabled: Boolean) {
@@ -111,6 +103,27 @@ class PreferencesManager @Inject constructor(
 
     suspend fun setExcludedSocialMediaPackages(packages: Set<String>) {
         dataStore.edit { it[KEY_EXCLUDED_SOCIAL_PACKAGES] = packages }
+    }
+
+    val customSocialMediaPackages: Flow<Set<String>> = dataStore.data.map { prefs ->
+        prefs[KEY_CUSTOM_SOCIAL_PACKAGES] ?: emptySet()
+    }
+
+    suspend fun getCustomSocialMediaPackages(): Set<String> =
+        dataStore.data.map { it[KEY_CUSTOM_SOCIAL_PACKAGES] ?: emptySet() }.first()
+
+    suspend fun addCustomSocialMediaPackage(packageName: String) {
+        dataStore.edit { prefs ->
+            val current = prefs[KEY_CUSTOM_SOCIAL_PACKAGES] ?: emptySet()
+            prefs[KEY_CUSTOM_SOCIAL_PACKAGES] = current + packageName
+        }
+    }
+
+    suspend fun removeCustomSocialMediaPackage(packageName: String) {
+        dataStore.edit { prefs ->
+            val current = prefs[KEY_CUSTOM_SOCIAL_PACKAGES] ?: emptySet()
+            prefs[KEY_CUSTOM_SOCIAL_PACKAGES] = current - packageName
+        }
     }
 
     // anyStrictActive and parentalActive are managed by SessionPreferences (device-protected
@@ -162,9 +175,9 @@ class PreferencesManager @Inject constructor(
         private val KEY_PIN_ATTEMPT_COUNT = intPreferencesKey("pin_attempt_count")
         private val KEY_PIN_LOCKOUT_UNTIL = longPreferencesKey("pin_lockout_until")
         private val KEY_PARENTAL_SETUP_STEP = intPreferencesKey("parental_setup_step")
-        private val KEY_ADULT_FILTER_ENABLED = booleanPreferencesKey("adult_filter_enabled")
         private val KEY_SOCIAL_MEDIA_FILTER_ENABLED = booleanPreferencesKey("social_media_filter_enabled")
         private val KEY_EXCLUDED_SOCIAL_PACKAGES = stringSetPreferencesKey("excluded_social_packages")
+        private val KEY_CUSTOM_SOCIAL_PACKAGES = stringSetPreferencesKey("custom_social_packages")
 
         const val DEFAULT_DELAY_SECONDS = 10
         const val DEFAULT_PHASE = 2
