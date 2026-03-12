@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AccessibilityNew
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,7 +60,6 @@ fun OnboardingScreen(
     val currentStep by viewModel.currentStep.collectAsStateWithLifecycle()
     val hasOverlay by viewModel.hasOverlay.collectAsStateWithLifecycle()
     val hasAccessibility by viewModel.hasAccessibility.collectAsStateWithLifecycle()
-    val hasUsageStats by viewModel.hasUsageStats.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -82,10 +80,6 @@ fun OnboardingScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { viewModel.refreshPermissions() }
 
-    val usageStatsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { viewModel.refreshPermissions() }
-
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { viewModel.advanceFromNotifications() }
@@ -93,7 +87,7 @@ fun OnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .statusBarsPadding()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -112,7 +106,7 @@ fun OnboardingScreen(
             OnboardingStep.OVERLAY -> PermissionStep(
                 icon = Icons.Outlined.Layers,
                 title = "Display over other apps",
-                description = "Pause needs to show a brief pause screen when you open a monitored app. This requires the \"Display over other apps\" permission.",
+                description = "Focus needs overlay permission to show Focus Mode and Content Shield protection screens.",
                 granted = hasOverlay,
                 grantedLabel = "Permission granted",
                 grantButtonLabel = "Grant permission",
@@ -130,7 +124,7 @@ fun OnboardingScreen(
             OnboardingStep.ACCESSIBILITY -> PermissionStep(
                 icon = Icons.Outlined.AccessibilityNew,
                 title = "Accessibility service",
-                description = "Pause uses the Accessibility Service to detect when you open a monitored app. It cannot read your messages, passwords, or personal content.",
+                description = "Focus uses Accessibility to detect app and browser changes for Focus Mode and Content Shield. It cannot read your personal content.",
                 granted = hasAccessibility,
                 grantedLabel = "Service enabled",
                 grantButtonLabel = "Enable in Settings",
@@ -142,25 +136,10 @@ fun OnboardingScreen(
                 onContinue = { viewModel.advanceFromAccessibility() }
             )
 
-            OnboardingStep.USAGE_STATS -> PermissionStep(
-                icon = Icons.Outlined.QueryStats,
-                title = "Usage access",
-                description = "Pause needs usage access to track how often you open monitored apps and to enforce daily limits. Your app usage data stays on your device.",
-                granted = hasUsageStats,
-                grantedLabel = "Permission granted",
-                grantButtonLabel = "Open Settings",
-                onGrant = {
-                    usageStatsLauncher.launch(
-                        Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-                    )
-                },
-                onContinue = { viewModel.advanceFromUsageStats() }
-            )
-
             OnboardingStep.NOTIFICATIONS -> PermissionStep(
                 icon = Icons.Outlined.Notifications,
                 title = "Notifications",
-                description = "Pause shows a persistent notification while Strict Mode is active so you always know a session is running.",
+                description = "Focus shows a persistent notification while Focus Mode is active so you always know a session is running.",
                 granted = false,
                 grantedLabel = "Permission granted",
                 grantButtonLabel = "Allow notifications",
@@ -188,7 +167,6 @@ private fun StepIndicator(currentStep: OnboardingStep) {
         OnboardingStep.WELCOME,
         OnboardingStep.OVERLAY,
         OnboardingStep.ACCESSIBILITY,
-        OnboardingStep.USAGE_STATS,
         OnboardingStep.NOTIFICATIONS,
         OnboardingStep.DONE
     )
@@ -215,14 +193,14 @@ private fun WelcomeStep(onNext: () -> Unit) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
-            text = "Welcome to Pause",
+            text = "Welcome to Focus",
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Pause helps you use your phone on your own terms — with a brief pause before opening distracting apps.",
+            text = "Focus helps you use your phone on your own terms by protecting your attention from distractions.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
@@ -360,7 +338,7 @@ private fun DoneStep(onFinish: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Pause is ready to help you take back control of your screen time.",
+            text = "Focus is ready to help you take back control of your screen time.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
@@ -370,7 +348,7 @@ private fun DoneStep(onFinish: () -> Unit) {
             onClick = onFinish,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Start using Pause")
+            Text("Start using Focus")
         }
     }
 }
