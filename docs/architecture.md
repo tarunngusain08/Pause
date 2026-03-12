@@ -9,22 +9,22 @@ This document describes how the Focus Android app is structured at the code leve
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  UI (Jetpack Compose)                                            │
-│  HomeScreen, ParentDashboardScreen, WebFilterDashboardScreen,    │
-│  OnboardingScreen, SettingsScreen, FocusModeScreen, etc.         │
+│  HomeScreen, ContentShieldScreen, StrictModeSetupScreen,          │
+│  OnboardingScreen, UnblockRequestScreen, etc.                    │
 └─────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  ViewModels (Hilt-injected)                                       │
-│  HomeViewModel, ChildStatusViewModel, WebFilterDashboardViewModel│
+│  HomeViewModel, ContentShieldViewModel, StrictModeSetupViewModel  │
 │  State: UiState / Flow; call repositories and services            │
 └─────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Repository Layer                                                │
-│  AppRepository, LaunchRepository, BlacklistRepository,           │
-│  WhitelistRepository, SessionRepository, InsightsRepository, ...  │
+│  BlacklistRepository, SessionRepository, InsightsRepository,     │
+│  WebFilterConfigRepository, etc.                                 │
 └─────────────────────────────────────────────────────────────────┘
                                     │
                     ┌───────────────┼───────────────┐
@@ -53,8 +53,8 @@ This document describes how the Focus Android app is structured at the code leve
 - **Application:** `PauseApplication` is annotated with `@HiltAndroidApp` and implements `Configuration.Provider` for WorkManager with `HiltWorkerFactory`.
 - **Modules:** `DatabaseModule` provides `PauseDatabase` and DAOs; `AppModule` provides repositories, overlay manager, session managers, and other app-scoped objects.
 - **Entry Points** (for non-Hilt contexts):
-  - **PauseAccessibilityEntryPoint** — Used by `PauseAccessibilityService` to get `OverlayManager`, `AppRepository`, `LaunchRepository`, `AllowanceTracker`, `SessionRepository`, `ParentalBlockedAppRepository`, `PreferencesManager`, `StrictSessionManager`, `ParentalControlManager`, `InsightsRepository`, `BrowserURLReader`, `URLClassifier`, `URLCaptureQueue`, `AutoBlacklistEngine`, `WebFilterConfigRepository`.
-  - **VpnEntryPoint** — Used by `PauseVpnService` to get `BlocklistMatcher`, `WhitelistMatcher`, `WebFilterConfigRepository` (also exposes `BlacklistRepository`, `WhitelistRepository`).
+  - **PauseAccessibilityEntryPoint** — Used by `PauseAccessibilityService` to get `OverlayManager`, `StrictSessionManager`, `ContentShieldManager`, `InsightsRepository`, `BrowserURLReader`, `URLClassifier`, `URLCaptureQueue`, `AutoBlacklistEngine`, `WebFilterConfigRepository`.
+  - **VpnEntryPoint** — Used by `PauseVpnService` to get `BlocklistMatcher`, `WebFilterConfigRepository`.
   - **BootEntryPoint** — Used by `BootReceiver` to get `StrictSessionManager`, `ParentalControlManager`, `WebFilterConfigRepository` for resuming sessions and VPN after boot.
 
 Only the minimum set of dependencies is exposed per entry point to keep services decoupled from the full graph.
@@ -65,7 +65,7 @@ Only the minimum set of dependencies is exposed per entry point to keep services
 
 - **Single Activity:** `MainActivity` hosts Compose and sets `setContent { PauseTheme { Surface { PauseNavGraph() } } }`.
 - **PauseNavGraph** uses a single `NavHost` and `rememberNavController()`. Start destination is `Routes.ONBOARDING` or `Routes.HOME` based on `OnboardingViewModel.onboardingComplete` (via `collectAsStateWithLifecycle`).
-- **Routes** — Centralized in `Routes` object: `Routes.HOME`, `Routes.APP_SELECTION`, `Routes.PARENT_DASHBOARD`, `Routes.WEB_FILTER_DASHBOARD`, `Routes.UNBLOCK_REQUEST`, etc.
+- **Routes** — Centralized in `Routes` object: `Routes.ONBOARDING`, `Routes.HOME`, `Routes.FOCUS_SETUP`, `Routes.CONTENT_SHIELD`, `Routes.UNBLOCK_REQUEST`.
 - **Deep link:** `focus://unblock-request?domain={domain}` opens `UnblockRequestScreen` with the given domain (e.g. from the block page “Request Review” button).
 
 ---
@@ -76,22 +76,22 @@ Only the minimum set of dependencies is exposed per entry point to keep services
    - Schedules `MidnightResetWorker` as unique periodic work (24-hour period, first run at next midnight).
 
 2. **First launch / not onboarding complete**  
-   - Nav graph shows `OnboardingScreen`; user grants Accessibility, overlay, and (optionally) usage access, then selects monitored apps. On complete, `onboardingComplete` is persisted and nav moves to `home`.
+   - Nav graph shows `OnboardingScreen`; user grants Accessibility and overlay permissions. On complete, `onboardingComplete` is persisted and nav moves to `home`.
 
 3. **Accessibility Service**  
    - User enables Focus in Settings → Accessibility. `PauseAccessibilityService.onServiceConnected()` runs; it obtains `OverlayManager` and other deps via `PauseAccessibilityEntryPoint` and then handles `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOW_CONTENT_CHANGED` for app interception and URL capture.
 
-4. **Web Filter (if enabled by parent)**  
-   - Parent enables Web Filter from Parent Dashboard; app starts `PauseVpnService` with `ACTION_START`. VPN establishes a TUN interface (excluding the Focus app via `addDisallowedApplication`) and runs the DNS loop on a coroutine. `BootReceiver` re-starts VPN after `BOOT_COMPLETED` / `LOCKED_BOOT_COMPLETED` if `vpnEnabled` was true.
+4. **Content Shield (if enabled)**  
+   - User enables Content Shield from Content Shield screen; app starts `PauseVpnService` with `ACTION_START`. VPN establishes a TUN interface (excluding the Focus app via `addDisallowedApplication`) and runs the DNS loop on a coroutine. `BootReceiver` re-starts VPN after `BOOT_COMPLETED` / `LOCKED_BOOT_COMPLETED` if `vpnEnabled` was true.
 
 ---
 
 ## 5. Key Cross-Cutting Behaviors
 
-- **Foreground detection** — Only in Accessibility Service; uses `event.packageName` and ignores when it hasn’t changed. Interception is delegated to **InterceptionPipeline** (Strict → Commitment → Parental → Standard).
-- **Overlays** — All shown via `OverlayManager` (delay, reflection, commitment block, strict block, parental block, lock intervention, PIN entry, etc.). Manager holds a single `currentOverlay` and `OverlayState`; `dismiss()` only clears overlays that are “interception” related, not session-complete or informational ones.
+- **Foreground detection** — Only in Accessibility Service; uses `event.packageName` and ignores when it hasn’t changed. Interception is delegated to **InterceptionPipeline** (Strict → Content Shield).
+- **Overlays** — All shown via `OverlayManager` (strict block, content shield block, parental block, lock intervention, PIN entry, etc.). Manager holds a single `currentOverlay` and `OverlayState`; `dismiss()` only clears overlays that are “interception” related, not session-complete or informational ones.
 - **Persistence** — All configuration and behavioral data goes through Room or DataStore; no in-memory-only critical state.
-- **Midnight reset** — `MidnightResetWorker` runs once per day (scheduled for midnight); resets daily counters and evaluates streaks. WorkManager is configured with Hilt so workers can receive repositories via constructor injection.
+- **Midnight reset** — `MidnightResetWorker` runs once per day (scheduled for midnight); deletes old launch events, reflection responses, unlock events, sessions, URL visit log, and pending reviews. WorkManager is configured with Hilt so workers can receive repositories via constructor injection.
 
 ---
 
