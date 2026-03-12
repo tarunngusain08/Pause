@@ -22,7 +22,6 @@ import com.pause.app.data.db.dao.StreakDao
 import com.pause.app.data.db.dao.UnlockEventDao
 import com.pause.app.data.db.dao.UrlVisitLogDao
 import com.pause.app.data.db.dao.WebFilterConfigDao
-import com.pause.app.data.db.dao.WhitelistedDomainDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -43,7 +42,7 @@ object DatabaseModule {
             context
         }
         return Room.databaseBuilder(dbContext, PauseDatabase::class.java, "pause_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
     }
 
@@ -172,6 +171,12 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS whitelisted_domains")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideMonitoredAppDao(db: PauseDatabase): MonitoredAppDao = db.monitoredAppDao()
@@ -226,11 +231,6 @@ object DatabaseModule {
     @Singleton
     fun provideBlacklistedDomainDao(db: PauseDatabase): BlacklistedDomainDao =
         db.blacklistedDomainDao()
-
-    @Provides
-    @Singleton
-    fun provideWhitelistedDomainDao(db: PauseDatabase): WhitelistedDomainDao =
-        db.whitelistedDomainDao()
 
     @Provides
     @Singleton
