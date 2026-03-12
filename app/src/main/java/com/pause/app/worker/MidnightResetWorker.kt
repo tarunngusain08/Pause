@@ -6,13 +6,10 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.pause.app.data.db.dao.PendingReviewDao
-import com.pause.app.data.repository.AppRepository
 import com.pause.app.data.repository.InsightsRepository
 import com.pause.app.data.repository.LaunchRepository
 import com.pause.app.data.repository.SessionRepository
-import com.pause.app.data.repository.StreakRepository
 import com.pause.app.data.repository.UrlVisitLogRepository
-import com.pause.app.util.DateUtils
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
@@ -27,9 +24,7 @@ class MidnightResetWorker @AssistedInject constructor(
     private val insightsRepository: InsightsRepository,
     private val sessionRepository: SessionRepository,
     private val urlVisitLogRepository: UrlVisitLogRepository,
-    private val pendingReviewDao: PendingReviewDao,
-    private val appRepository: AppRepository,
-    private val streakRepository: StreakRepository
+    private val pendingReviewDao: PendingReviewDao
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -42,50 +37,10 @@ class MidnightResetWorker @AssistedInject constructor(
             sessionRepository.deleteSessionsOlderThan(ninetyDaysAgo)
             urlVisitLogRepository.deleteOlderThan(thirtyDaysAgo)
             pendingReviewDao.deleteOlderThan(ninetyDaysAgo)
-            evaluateStreak()
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Midnight reset failed", e)
             Result.retry()
-        }
-    }
-
-    private suspend fun evaluateStreak() {
-        val yesterdayStart = DateUtils.getYesterdayMidnight()
-        val yesterdayCounts = launchRepository.getYesterdayLaunchCountsPerPackage()
-        val monitoredApps = appRepository.getActiveMonitoredAppsSnapshot()
-        val exceededLimit = monitoredApps.any { app ->
-            val limit = app.dailyLaunchLimit ?: return@any false
-            val count = yesterdayCounts[app.packageName] ?: 0
-            count > limit
-        }
-        val currentStreak = streakRepository.getStreak()
-            ?: com.pause.app.data.db.entity.Streak(id = 1)
-        if (exceededLimit) {
-            if (currentStreak.shieldsRemaining > 0) {
-                streakRepository.insertOrUpdateStreak(
-                    currentStreak.copy(shieldsRemaining = currentStreak.shieldsRemaining - 1)
-                )
-            } else {
-                streakRepository.insertOrUpdateStreak(
-                    currentStreak.copy(
-                        currentStreakDays = 0,
-                        streakStartedAt = 0,
-                        lastValidDay = yesterdayStart
-                    )
-                )
-            }
-        } else {
-            val newDays = currentStreak.currentStreakDays + 1
-            val longest = maxOf(currentStreak.longestStreakEver, newDays)
-            streakRepository.insertOrUpdateStreak(
-                currentStreak.copy(
-                    currentStreakDays = newDays,
-                    streakStartedAt = if (currentStreak.streakStartedAt == 0L) yesterdayStart else currentStreak.streakStartedAt,
-                    lastValidDay = yesterdayStart,
-                    longestStreakEver = longest
-                )
-            )
         }
     }
 
