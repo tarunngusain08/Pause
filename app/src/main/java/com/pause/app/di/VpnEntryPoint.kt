@@ -2,8 +2,6 @@ package com.pause.app.di
 
 import com.pause.app.data.repository.BlacklistRepository
 import com.pause.app.service.webfilter.BlocklistMatcher
-import com.pause.app.service.webfilter.WhitelistMatcher
-import com.pause.app.data.repository.WhitelistRepository
 import com.pause.app.data.repository.WebFilterConfigRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -13,8 +11,6 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface VpnEntryPoint {
     fun getBlacklistRepository(): BlacklistRepository
-    fun getWhitelistRepository(): WhitelistRepository
     fun getWebFilterConfigRepository(): WebFilterConfigRepository
     fun getBlocklistMatcher(): BlocklistMatcher
-    fun getWhitelistMatcher(): WhitelistMatcher
 }
