@@ -4,25 +4,36 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!--
+        Semi-transparent white ring (donut), centered at (54,54).
+        Outer radius = 30, inner radius = 23.
+        Built with even-odd fill: two full circles, the inner one "punches out" the center.
+    -->
+    <path
+        android:fillColor="#45FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="
+            M54,24 C38.536,24 26,36.536 26,52 C26,67.464 38.536,80 54,80
+            C69.464,80 82,67.464 82,52 C82,36.536 69.464,24 54,24 Z
+            M54,31 C65.598,31 75,40.402 75,52 C75,63.598 65.598,73 54,73
+            C42.402,73 33,63.598 33,52 C33,40.402 42.402,31 54,31 Z" />
+
+    <!--
+        Left pause bar — rounded rectangle using M/L/A commands.
+        Rect: left=36, top=37, right=46, bottom=67, corner radius=5
+    -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,30 a24,24 0 1,1 0,48 a24,24 0 1,1 0,-48" />
-    <path
-        android:fillColor="#4A90A4"
-        android:pathData="M54,38 a16,16 0 1,1 0,32 a16,16 0 1,1 0,-32" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,48 a6,6 0 1,1 0,12 a6,6 0 1,1 0,-12" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M52,18h4v10h-4z" />
+        android:pathData="
+            M36,42 L36,62 Q36,67 41,67 L41,67 Q46,67 46,62 L46,42 Q46,37 41,37 L41,37 Q36,37 36,42 Z" />
+
+    <!--
+        Right pause bar — rounded rectangle.
+        Rect: left=62, top=37, right=72, bottom=67, corner radius=5
+    -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M52,80h4v10h-4z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M18,52h10v4h-10z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M80,52h10v4h-10z" />
+        android:pathData="
+            M62,42 L62,62 Q62,67 67,67 L67,67 Q72,67 72,62 L72,42 Q72,37 67,37 L67,37 Q62,37 62,42 Z" />
 </vector>
