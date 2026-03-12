@@ -2,8 +2,8 @@ package com.pause.app.service.contentshield
 
 import com.pause.app.data.preferences.PreferencesManager
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,8 +14,8 @@ private val SOCIAL_MEDIA_PACKAGES = setOf(
     "com.facebook.katana",
     "com.facebook.orca",
     "com.snapchat.android",
-    "com.zhiliaoapp.musically",
-    "com.ss.android.ugc.trill",
+    "com.zhiliaoapp.musically", // TikTok (international)
+    "com.ss.android.ugc.trill", // TikTok (regional variant)
     "com.reddit.frontpage",
     "com.pinterest",
     "com.linkedin.android",
@@ -31,39 +31,37 @@ private val SOCIAL_MEDIA_PACKAGES = setOf(
 class ContentShieldManager @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) {
-    val adultFilterEnabled: Flow<Boolean> = preferencesManager.adultFilterEnabled
     val socialMediaFilterEnabled: Flow<Boolean> = preferencesManager.socialMediaFilterEnabled
-
-    suspend fun isAdultFilterEnabled(): Boolean = preferencesManager.adultFilterEnabled.first()
-    suspend fun isSocialMediaFilterEnabled(): Boolean = preferencesManager.socialMediaFilterEnabled.first()
-
-    suspend fun setAdultFilterEnabled(enabled: Boolean) {
-        preferencesManager.setAdultFilterEnabled(enabled)
-    }
 
     suspend fun setSocialMediaFilterEnabled(enabled: Boolean) {
         preferencesManager.setSocialMediaFilterEnabled(enabled)
     }
 
+    val socialMediaPackages: Flow<Set<String>> = preferencesManager.customSocialMediaPackages.map { custom ->
+        SOCIAL_MEDIA_PACKAGES + custom
+    }
+
     suspend fun isPackageBlocked(packageName: String): Boolean {
         if (!preferencesManager.socialMediaFilterEnabled.first()) return false
-        if (packageName !in SOCIAL_MEDIA_PACKAGES) return false
+        val allPackages = SOCIAL_MEDIA_PACKAGES + preferencesManager.getCustomSocialMediaPackages()
+        if (packageName !in allPackages) return false
         val excluded = preferencesManager.excludedSocialMediaPackages.first()
         return packageName !in excluded
     }
 
-    fun getSocialMediaPackages(): Set<String> = SOCIAL_MEDIA_PACKAGES
+    suspend fun addCustomSocialMediaPackage(packageName: String) {
+        preferencesManager.addCustomSocialMediaPackage(packageName)
+    }
 
-    fun getBlockedSocialMediaApps(): Flow<Set<String>> = combine(
-        preferencesManager.socialMediaFilterEnabled,
-        preferencesManager.excludedSocialMediaPackages
-    ) { enabled, excluded ->
-        if (!enabled) emptySet()
-        else SOCIAL_MEDIA_PACKAGES - excluded
+    suspend fun removeCustomSocialMediaPackage(packageName: String) {
+        preferencesManager.removeCustomSocialMediaPackage(packageName)
     }
 
     val excludedSocialMediaPackages: Flow<Set<String>> =
         preferencesManager.excludedSocialMediaPackages
+
+    val customSocialMediaPackages: Flow<Set<String>> =
+        preferencesManager.customSocialMediaPackages
 
     suspend fun setExcludedSocialMediaPackages(packages: Set<String>) {
         preferencesManager.setExcludedSocialMediaPackages(packages)
