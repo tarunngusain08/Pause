@@ -7,14 +7,15 @@ Focus stores all app and web-filter data locally using **Room** (SQLite). Reposi
 ## 1. PauseDatabase
 
 - **Class:** `com.pause.app.data.db.PauseDatabase`
-- **Version:** 3
+- **Version:** 6
 - **TypeConverters:** `Converters` (for enums, timestamps, etc.)
 - **Storage:** Built with `createDeviceProtectedStorageContext()` on API 24+ so data is available after device unlock (e.g. for WorkManager and services).
 
 Migrations:
 
 - **1 → 2:** No schema change (placeholder).
-- **2 → 3:** Adds Web Filter tables: `blacklisted_domains`, `whitelisted_domains`, `keyword_entries`, `url_visit_log`, `pending_review`, `web_filter_config`, plus indexes.
+- **2 → 3:** Adds Web Filter tables: `blacklisted_domains`, `keyword_entries`, `url_visit_log`, `pending_review`, `web_filter_config`, plus indexes.
+- **5 → 6:** Drops `whitelisted_domains` table (whitelist removed).
 
 ---
 
@@ -35,7 +36,6 @@ Migrations:
 | **ParentalBlockedApp** | ParentalBlockedAppDao | Apps blocked or friction-only under parental control. |
 | **PINAuditLog** | PINAuditLogDao | Audit log for parent PIN entry (e.g. success/fail). |
 | **BlacklistedDomain** | BlacklistedDomainDao | Web Filter: blocked domains (domain, source, category, active, pending review). |
-| **WhitelistedDomain** | WhitelistedDomainDao | Web Filter: allowed domains (override blacklist). |
 | **KeywordEntry** | KeywordDao | Web Filter: keyword list (keyword, category, active, bundled). |
 | **UrlVisitLog** | UrlVisitLogDao | Web Filter: visited URLs (fullUrl, domain, browser, time, blocked, classification). |
 | **PendingReview** | PendingReviewDao | Web Filter: unblock requests and auto-blocks for parent review. |
@@ -49,10 +49,8 @@ Repositories are provided by Hilt and used by ViewModels and services (via entry
 
 ### Core app behavior
 
-- **AppRepository** — Monitored apps: add/remove, get by package, friction level, launch limit, `isMonitored(packageName)`.
-- **LaunchRepository** — Record launch events, `getTodayLaunchCount(packageName)`, cancel last launch; used by OverlayManager and MidnightResetWorker.
-- **SessionRepository** — Save/get focus and commitment sessions, `getActiveFocusSession()`, `getActiveCommitmentSession()`, `isPackageInCommitmentBlockList()`, `markSessionBroken()`.
-- **StreakDao / StreakRepository** (or equivalent) — Streak read/update, shield use, reset; used at midnight and on commitment break.
+- **LaunchRepository** — Record launch events; used by MidnightResetWorker for cleanup (`deleteEventsOlderThan`).
+- **SessionRepository** — Save/get focus and strict sessions, `getActiveFocusSession()`, `markSessionBroken()`.
 - **InsightsRepository** — Unlock count, weekly/monthly aggregates, daily summary for accountability; uses LaunchEventDao, UnlockEventDao, UsageStatsManager.
 - **AccountabilityRepository** — Partner setup, last summary sent. (AccountabilityDispatchWorker for daily SMS summary is not yet implemented.)
 
@@ -65,7 +63,6 @@ Repositories are provided by Hilt and used by ViewModels and services (via entry
 ### Web Filter
 
 - **BlacklistRepository** — Active blacklisted domains for VPN and UI; `getActiveDomainsAsList()`, add/remove/toggle, pending review.
-- **WhitelistRepository** — Whitelisted domains; `getAllAsList()`, add/remove; used by WhitelistMatcher.
 - **KeywordRepository** — Keyword list for URL classifier; active keywords, add/remove, categories.
 - **UrlVisitLogRepository** — Insert visit log, get recent for parent, mark reviewed; used by URLCaptureQueue and Web Filter UI.
 - **WebFilterConfigRepository** — Get/update singleton WebFilterConfig (vpn_enabled, url_reader_enabled, upstream_dns, etc.); used by VPN and Accessibility Service.
@@ -73,23 +70,22 @@ Repositories are provided by Hilt and used by ViewModels and services (via entry
 
 ---
 
-## 4. Preferences and Feature Flags
+## 4. Preferences
 
-- **PreferencesManager** — Uses **DataStore** (`pause_preferences`). Holds: `delayDurationSeconds`, `onboardingComplete`, `currentPhase`, `dailyAllowanceMinutes`, `lastCostOfScrollShownDate`, `showReEntryPrompt`, parental setup step, PIN hash, recovery phrase hash, PIN attempt/lockout. Provided via Hilt.
-- **FeatureFlags** — Wraps `PreferencesManager.currentPhase`; exposes `isPhase2Enabled`, `isPhase3Enabled` as Flow. Phase is used for feature gating (e.g. allowance, launch limits). Not exposed via PauseAccessibilityEntryPoint; reflection in the interception pipeline is driven by friction level (MEDIUM/HIGH) and focus session.
+- **PreferencesManager** — Uses **DataStore** (`pause_preferences`). Holds: `onboardingComplete`, parental setup step, PIN hash, recovery phrase hash, PIN attempt/lockout. Provided via Hilt.
 
 ---
 
 ## 5. Usage from Services
 
-- **PauseAccessibilityService** — Gets dependencies via **PauseAccessibilityEntryPoint**: OverlayManager, AppRepository, LaunchRepository, AllowanceTracker, SessionRepository, ParentalBlockedAppRepository, PreferencesManager, StrictSessionManager, ParentalControlManager, InsightsRepository, BrowserURLReader, URLClassifier, URLCaptureQueue, AutoBlacklistEngine, WebFilterConfigRepository. Uses **InterceptionPipeline** for app interception logic.
-- **PauseVpnService** — Gets **VpnEntryPoint**: BlocklistMatcher, WhitelistMatcher, WebFilterConfigRepository. BlocklistMatcher and WhitelistMatcher internally use BlacklistRepository and WhitelistRepository and cache domain sets in memory (with mutex and 60s reload).
+- **PauseAccessibilityService** — Gets dependencies via **PauseAccessibilityEntryPoint**: OverlayManager, StrictSessionManager, ContentShieldManager, InsightsRepository, BrowserURLReader, URLClassifier, URLCaptureQueue, AutoBlacklistEngine, WebFilterConfigRepository. Uses **InterceptionPipeline** for app interception logic.
+- **PauseVpnService** — Gets **VpnEntryPoint**: BlocklistMatcher, WebFilterConfigRepository. BlocklistMatcher uses BlacklistRepository and caches domain set in memory (with mutex and 60s reload).
 
 ---
 
 ## 6. Workers
 
-- **MidnightResetWorker** — Scheduled as unique periodic work (24h, first run at next midnight). In `doWork()`: deletes launch events, reflection responses, unlock events, and sessions older than 90 days; deletes URL visit log and pending reviews older than 30/90 days; calls `evaluateStreak()` which checks yesterday’s launch counts against per-app limits, uses shields or resets streak accordingly. Uses Hilt’s `HiltWorkerFactory`; injects LaunchRepository, InsightsRepository, SessionRepository, UrlVisitLogRepository, PendingReviewDao, AppRepository, StreakRepository.
+- **MidnightResetWorker** — Scheduled as unique periodic work (24h, first run at next midnight). In `doWork()`: deletes launch events, reflection responses, unlock events, and sessions older than 90 days; deletes URL visit log and pending reviews older than 30/90 days. Uses Hilt’s `HiltWorkerFactory`; injects LaunchRepository, InsightsRepository, SessionRepository, UrlVisitLogRepository, PendingReviewDao.
 
 ---
 
