@@ -2,9 +2,7 @@ package com.pause.app.service.strict
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
-import org.json.JSONArray
 import com.pause.app.data.db.entity.Session
 import com.pause.app.data.db.entity.StrictBreakLog
 import com.pause.app.data.preferences.SessionPreferences
@@ -48,17 +46,14 @@ class StrictSessionManager @Inject constructor(
 
     fun getActiveSession(): Session? = _activeSession.value
 
-    suspend fun startSession(durationMs: Long, packages: List<String>): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun startSession(durationMs: Long): Result<Unit> = withContext(Dispatchers.IO) {
         val endTimeEpoch = System.currentTimeMillis() + durationMs
-        val blockedPackagesJson = packages.let { list ->
-            "[\"${list.joinToString("\",\"")}\"]"
-        }
         val session = Session(
             sessionType = Session.SessionType.STRICT,
             startedAt = System.currentTimeMillis(),
             endsAt = endTimeEpoch,
             isActive = true,
-            blockedPackages = blockedPackagesJson,
+            blockedPackages = "[]",
             settingsLocked = true
         )
         val id = strictSessionRepository.saveSession(session)
@@ -114,9 +109,8 @@ class StrictSessionManager @Inject constructor(
     }
 
     fun isPackageBlocked(packageName: String): Boolean {
-        val session = _activeSession.value ?: return false
-        val packages = parseBlockedPackages(session.blockedPackages)
-        return packageName in packages
+        _activeSession.value ?: return false
+        return packageName !in FOCUS_MODE_ALLOWLIST
     }
 
     fun isSettingsLocked(): Boolean = _activeSession.value?.settingsLocked == true
@@ -165,17 +159,24 @@ class StrictSessionManager @Inject constructor(
         }
     }
 
-    private fun parseBlockedPackages(json: String): Set<String> {
-        return try {
-            val arr = JSONArray(json)
-            buildSet { for (i in 0 until arr.length()) add(arr.getString(i)) }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse blocked packages JSON: $json", e)
-            emptySet()
-        }
-    }
-
     companion object {
-        private const val TAG = "StrictSessionManager"
+        private val FOCUS_MODE_ALLOWLIST = setOf(
+            "com.android.dialer",
+            "com.android.contacts",
+            "com.android.deskclock",
+            "com.android.camera",
+            "com.android.calculator2",
+            "com.android.emergency",
+            "com.google.android.dialer",
+            "com.google.android.contacts",
+            "com.google.android.deskclock",
+            "com.google.android.calculator",
+            "com.android.systemui",
+            "com.android.launcher",
+            "com.android.launcher3",
+            "com.google.android.apps.nexuslauncher",
+            "com.sec.android.app.launcher",
+            "com.pause.app"
+        )
     }
 }
