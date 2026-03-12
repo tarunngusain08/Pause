@@ -54,12 +54,12 @@ class AssetImporter @Inject constructor(
     suspend fun importDomainCategoriesIfNeeded() {
         val json = readAsset("domain_categories.json") ?: return
         val obj = JSONObject(json)
-        val domains = mutableListOf<BlacklistedDomain>()
         val now = System.currentTimeMillis()
 
         for (key in obj.keys()) {
             val category = key
             val array = obj.optJSONArray(category) ?: continue
+            val domains = mutableListOf<BlacklistedDomain>()
             for (i in 0 until array.length()) {
                 val domain = array.optString(i, "").lowercase().trim()
                     .removePrefix("www.")
@@ -77,10 +77,9 @@ class AssetImporter @Inject constructor(
                     )
                 }
             }
-        }
-        // insertCategoryDomainsIfNone performs an atomic check-then-insert within a transaction
-        if (domains.isNotEmpty()) {
-            blacklistedDomainDao.insertCategoryDomainsIfNone(domains)
+            if (domains.isNotEmpty()) {
+                blacklistedDomainDao.insertCategoryDomainsIfNoneForCategory(domains)
+            }
         }
     }
 
