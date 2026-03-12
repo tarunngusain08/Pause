@@ -65,7 +65,7 @@ class BootReceiver : BroadcastReceiver() {
             ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(
-                NotificationChannel(channelId, "Pause Errors", NotificationManager.IMPORTANCE_HIGH)
+                NotificationChannel(channelId, "Focus Errors", NotificationManager.IMPORTANCE_HIGH)
             )
         }
         val launchIntent = context.packageManager
@@ -79,8 +79,8 @@ class BootReceiver : BroadcastReceiver() {
         } else null
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("Pause needs attention")
-            .setContentText("Boot recovery failed. Please open Pause to restore your session.")
+            .setContentTitle("Focus needs attention")
+            .setContentText("Boot recovery failed. Please open Focus to restore your session.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .apply { if (pi != null) setContentIntent(pi) }
