@@ -9,7 +9,6 @@ import com.pause.app.data.db.dao.AccountabilityDao
 import com.pause.app.data.db.dao.BlacklistedDomainDao
 import com.pause.app.data.db.dao.KeywordDao
 import com.pause.app.data.db.dao.LaunchEventDao
-import com.pause.app.data.db.dao.MonitoredAppDao
 import com.pause.app.data.db.dao.ParentalBlockedAppDao
 import com.pause.app.data.db.dao.ParentalConfigDao
 import com.pause.app.data.db.dao.PendingReviewDao
@@ -18,7 +17,6 @@ import com.pause.app.data.db.dao.ReflectionResponseDao
 import com.pause.app.data.db.dao.ScheduleBandDao
 import com.pause.app.data.db.dao.SessionDao
 import com.pause.app.data.db.dao.StrictBreakLogDao
-import com.pause.app.data.db.dao.StreakDao
 import com.pause.app.data.db.dao.UnlockEventDao
 import com.pause.app.data.db.dao.UrlVisitLogDao
 import com.pause.app.data.db.dao.WebFilterConfigDao
@@ -179,19 +177,11 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideMonitoredAppDao(db: PauseDatabase): MonitoredAppDao = db.monitoredAppDao()
-
-    @Provides
-    @Singleton
     fun provideLaunchEventDao(db: PauseDatabase): LaunchEventDao = db.launchEventDao()
 
     @Provides
     @Singleton
     fun provideSessionDao(db: PauseDatabase): SessionDao = db.sessionDao()
-
-    @Provides
-    @Singleton
-    fun provideStreakDao(db: PauseDatabase): StreakDao = db.streakDao()
 
     @Provides
     @Singleton
