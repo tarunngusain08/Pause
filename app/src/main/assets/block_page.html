@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site Blocked - Pause</title>
+    <title>Site Blocked - Focus</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -40,7 +40,7 @@
 </head>
 <body>
     <div class="card">
-        <h1>This site is blocked by Pause</h1>
+        <h1>This site is blocked by Focus</h1>
         <p class="domain" id="domain"></p>
         <p>Your parent has configured web filtering. If you believe this site should be allowed, you can request a review.</p>
         <a href="#" id="request-link">Request Review</a>
@@ -49,7 +49,7 @@
         var params = new URLSearchParams(window.location.search);
         var domain = params.get('domain') || 'this site';
         document.getElementById('domain').textContent = domain;
-        document.getElementById('request-link').href = 'pause://unblock-request?domain=' + encodeURIComponent(domain);
+        document.getElementById('request-link').href = 'focus://unblock-request?domain=' + encodeURIComponent(domain);
     </script>
 </body>
 </html>
