@@ -16,14 +16,13 @@ import com.pause.app.R
 import com.pause.app.data.repository.ParentalConfigRepository
 import com.pause.app.receiver.ScheduleBandChangeReceiver
 import com.pause.app.service.parental.ScheduleEngine
-import com.pause.app.service.webfilter.PauseVpnService
 import com.pause.app.util.PermissionHelper
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
 /**
  * Runs every 6 hours to verify that critical Pause services are healthy.
- * Posts a user-facing notification if accessibility service, VPN, or parental schedule alarm is not running.
+ * Posts a user-facing notification if accessibility service or parental schedule alarm needs attention.
  */
 @HiltWorker
 class HealthCheckWorker @AssistedInject constructor(
@@ -39,16 +38,6 @@ class HealthCheckWorker @AssistedInject constructor(
 
             if (!PermissionHelper.hasAccessibilityServiceEnabled(appContext)) {
                 issues.add("Accessibility service is disabled")
-            }
-
-            val heartbeatPrefs = appContext.getSharedPreferences(
-                PauseVpnService.HEARTBEAT_PREFS,
-                Context.MODE_PRIVATE
-            )
-            val lastHeartbeat = heartbeatPrefs.getLong(PauseVpnService.KEY_LAST_HEARTBEAT, 0L)
-            val heartbeatAge = System.currentTimeMillis() - lastHeartbeat
-            if (lastHeartbeat > 0 && heartbeatAge > 2 * 60 * 60 * 1000L) {
-                issues.add("Web filter may have stopped")
             }
 
             val parentalConfig = parentalConfigRepository.getConfigSync()
