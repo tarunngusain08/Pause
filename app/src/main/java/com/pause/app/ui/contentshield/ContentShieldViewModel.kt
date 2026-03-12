@@ -3,142 +3,192 @@ package com.pause.app.ui.contentshield
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.VpnService
+import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.pause.app.data.AssetImporter
-import com.pause.app.data.repository.BlacklistRepository
-import com.pause.app.data.repository.KeywordRepository
-import com.pause.app.data.repository.WebFilterConfigRepository
 import com.pause.app.service.contentshield.ContentShieldManager
-import com.pause.app.service.webfilter.PauseVpnService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class ContentShieldUiState(
-    val adultFilterEnabled: Boolean = false,
     val socialMediaFilterEnabled: Boolean = false,
-    val blockedDomainsCount: Int = 0,
-    val blockedKeywordsCount: Int = 0,
-    val socialMediaApps: List<SocialMediaAppItem> = emptyList()
+    val socialMediaApps: List<SocialMediaAppItem> = emptyList(),
+    val isLoadingApps: Boolean = true
 )
 
 data class SocialMediaAppItem(
     val packageName: String,
     val appName: String,
-    val isBlocked: Boolean
+    val isBlocked: Boolean,
+    /** True for both built-in social media defaults and user-added custom social apps. */
+    val isSocial: Boolean
 )
 
 @HiltViewModel
 class ContentShieldViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val contentShieldManager: ContentShieldManager,
-    private val webFilterConfigRepository: WebFilterConfigRepository,
-    private val blacklistRepository: BlacklistRepository,
-    private val keywordRepository: KeywordRepository,
-    private val assetImporter: AssetImporter,
     private val packageManager: PackageManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ContentShieldUiState())
     val uiState: StateFlow<ContentShieldUiState> = _uiState.asStateFlow()
 
+    private val exclusionMutex = Mutex()
+
+    /**
+     * Frozen snapshot of the social-media package set, captured on first emission.
+     * Used for UI section classification so apps don't jump between "Social" and "Other"
+     * mid-session. Cleared by [refreshSnapshot] when the user navigates to the screen.
+     */
+    @Volatile
+    private var snapshotSocialPackages: Set<String>? = null
+
+    private val systemExcludePackages = setOf(
+        context.packageName,
+        "com.android.systemui",
+        "com.android.launcher",
+        "com.android.launcher3",
+        "com.google.android.apps.nexuslauncher",
+        "com.sec.android.app.launcher"
+    )
+
     init {
         viewModelScope.launch {
             combine(
-                contentShieldManager.adultFilterEnabled,
-                contentShieldManager.socialMediaFilterEnabled
-            ) { adult, social ->
-                Pair(adult, social)
-            }.collect { (adult, social) ->
-                _uiState.update {
-                    it.copy(
-                        adultFilterEnabled = adult,
-                        socialMediaFilterEnabled = social
-                    )
-                }
-            }
-        }
-        viewModelScope.launch {
-            blacklistRepository.getActiveDomains().collect { domains ->
-                _uiState.update { it.copy(blockedDomainsCount = domains.size) }
-            }
-        }
-        viewModelScope.launch {
-            keywordRepository.getActiveKeywordsFlow().collect { keywords ->
-                _uiState.update { it.copy(blockedKeywordsCount = keywords.size) }
-            }
-        }
-        viewModelScope.launch {
-            combine(
+                contentShieldManager.socialMediaFilterEnabled,
                 contentShieldManager.excludedSocialMediaPackages,
-                contentShieldManager.socialMediaFilterEnabled
-            ) { excluded, socialEnabled ->
-                if (!socialEnabled) emptyList()
-                else {
-                    contentShieldManager.getSocialMediaPackages().map { pkg ->
-                        val appName = try {
-                            val appInfo = packageManager.getApplicationInfo(pkg, 0)
-                            packageManager.getApplicationLabel(appInfo).toString()
-                        } catch (_: Exception) {
-                            pkg
+                contentShieldManager.socialMediaPackages,
+                contentShieldManager.customSocialMediaPackages
+            ) { socialEnabled, excluded, defaultPlusCustom, _ ->
+                // On first emission (or after refreshSnapshot), lock the section classification
+                if (snapshotSocialPackages == null) {
+                    snapshotSocialPackages = defaultPlusCustom
+                }
+                val apps = withContext(Dispatchers.IO) {
+                    buildUnifiedAppList(excluded, defaultPlusCustom, snapshotSocialPackages!!)
+                }
+                ContentShieldUiState(
+                    socialMediaFilterEnabled = socialEnabled,
+                    socialMediaApps = apps,
+                    isLoadingApps = false
+                )
+            }.collect { state ->
+                _uiState.value = state
+            }
+        }
+    }
+
+    /**
+     * Clears the frozen snapshot so the next flow emission picks up current membership.
+     * Should be called when the user navigates to the Social Media Filter screen.
+     */
+    fun refreshSnapshot() {
+        snapshotSocialPackages = null
+    }
+
+    /**
+     * Builds a unified list of ALL installed launcher apps.
+     * [sectionClassification] determines which section an app appears in (frozen snapshot).
+     * [liveDefaultPlusCustom] is used only to compute [SocialMediaAppItem.isBlocked] for
+     * newly-toggled apps that are in the live set but not yet in the snapshot.
+     */
+    private fun buildUnifiedAppList(
+        excluded: Set<String>,
+        liveDefaultPlusCustom: Set<String>,
+        sectionClassification: Set<String>
+    ): List<SocialMediaAppItem> {
+        val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+        val installedPkgs = packageManager.queryIntentActivities(intent, 0)
+            .map { it.activityInfo.packageName }
+            .filter { it !in systemExcludePackages }
+            .toSet()
+
+        fun resolveAppName(pkg: String): String? = try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
+        }
+
+        // Section placement comes from the snapshot; blocked state from the live data.
+        val socialItems = sectionClassification
+            .filter { it in installedPkgs }
+            .mapNotNull { pkg ->
+                val name = resolveAppName(pkg) ?: return@mapNotNull null
+                SocialMediaAppItem(
+                    packageName = pkg,
+                    appName = name,
+                    isBlocked = pkg in liveDefaultPlusCustom && pkg !in excluded,
+                    isSocial = true
+                )
+            }
+            .sortedBy { it.appName.lowercase() }
+
+        val otherItems = installedPkgs
+            .filter { it !in sectionClassification }
+            .mapNotNull { pkg ->
+                val name = resolveAppName(pkg) ?: return@mapNotNull null
+                val inLiveSet = pkg in liveDefaultPlusCustom
+                SocialMediaAppItem(
+                    packageName = pkg,
+                    appName = name,
+                    isBlocked = inLiveSet && pkg !in excluded,
+                    isSocial = false
+                )
+            }
+            .sortedBy { it.appName.lowercase() }
+
+        return socialItems + otherItems
+    }
+
+    /**
+     * Toggles blocking for any app:
+     * - Built-in default: toggle via excluded set
+     * - Custom app currently blocked: add to excluded (unblock) — keeps it in custom so it stays in social section
+     * - Custom app currently excluded: remove from excluded (re-block)
+     * - Non-social app not tracked: add to custom (block)
+     */
+    fun toggleAppBlocking(packageName: String) {
+        viewModelScope.launch {
+            exclusionMutex.withLock {
+                val excluded = contentShieldManager.excludedSocialMediaPackages.first()
+                val custom = contentShieldManager.customSocialMediaPackages.first()
+                val defaultPlusCustom = contentShieldManager.socialMediaPackages.first()
+                val isBuiltInDefault = packageName in defaultPlusCustom && packageName !in custom
+
+                when {
+                    isBuiltInDefault -> {
+                        val newExcluded = if (packageName in excluded) {
+                            excluded - packageName
+                        } else {
+                            excluded + packageName
                         }
-                        SocialMediaAppItem(
-                            packageName = pkg,
-                            appName = appName,
-                            isBlocked = pkg !in excluded
-                        )
+                        contentShieldManager.setExcludedSocialMediaPackages(newExcluded)
+                    }
+                    packageName in custom -> {
+                        // Toggle blocked/unblocked via excluded set; keep in custom so it stays
+                        // in the social section until the snapshot refreshes.
+                        val newExcluded = if (packageName in excluded) {
+                            excluded - packageName
+                        } else {
+                            excluded + packageName
+                        }
+                        contentShieldManager.setExcludedSocialMediaPackages(newExcluded)
+                    }
+                    else -> {
+                        contentShieldManager.addCustomSocialMediaPackage(packageName)
                     }
                 }
-            }.collect { apps ->
-                _uiState.update { it.copy(socialMediaApps = apps) }
-            }
-        }
-    }
-
-    fun toggleSocialMediaExclusion(packageName: String) {
-        viewModelScope.launch {
-            val excluded = contentShieldManager.excludedSocialMediaPackages.first()
-            val newExcluded = if (packageName in excluded) {
-                excluded - packageName
-            } else {
-                excluded + packageName
-            }
-            contentShieldManager.setExcludedSocialMediaPackages(newExcluded)
-        }
-    }
-
-    fun setAdultFilterEnabled(enabled: Boolean, context: Context) {
-        viewModelScope.launch {
-            contentShieldManager.setAdultFilterEnabled(enabled)
-            if (enabled) {
-                assetImporter.importBundledAssetsIfNeeded()
-                webFilterConfigRepository.setVpnEnabled(true)
-                webFilterConfigRepository.setUrlReaderEnabled(true)
-                webFilterConfigRepository.setKeywordFilterEnabled(true)
-                val prepareIntent = VpnService.prepare(context)
-                if (prepareIntent == null) {
-                    val svcIntent = Intent(context, PauseVpnService::class.java)
-                        .setAction(PauseVpnService.ACTION_START)
-                    context.startForegroundService(svcIntent)
-                } else {
-                    context.startActivity(prepareIntent)
-                }
-            } else {
-                webFilterConfigRepository.setKeywordFilterEnabled(false)
-                webFilterConfigRepository.setVpnEnabled(false)
-                if (!contentShieldManager.socialMediaFilterEnabled.first()) {
-                    webFilterConfigRepository.setUrlReaderEnabled(false)
-                }
-                val svcIntent = Intent(context, PauseVpnService::class.java)
-                    .setAction(PauseVpnService.ACTION_STOP)
-                context.startService(svcIntent)
             }
         }
     }
@@ -146,22 +196,6 @@ class ContentShieldViewModel @Inject constructor(
     fun setSocialMediaFilterEnabled(enabled: Boolean) {
         viewModelScope.launch {
             contentShieldManager.setSocialMediaFilterEnabled(enabled)
-            if (enabled) {
-                assetImporter.importBundledAssetsIfNeeded()
-                webFilterConfigRepository.setUrlReaderEnabled(true)
-            } else if (!contentShieldManager.adultFilterEnabled.first()) {
-                webFilterConfigRepository.setUrlReaderEnabled(false)
-            }
-        }
-    }
-
-    fun onResume(context: Context) {
-        viewModelScope.launch {
-            if (_uiState.value.adultFilterEnabled && VpnService.prepare(context) == null) {
-                val intent = Intent(context, PauseVpnService::class.java)
-                    .setAction(PauseVpnService.ACTION_START)
-                context.startForegroundService(intent)
-            }
         }
     }
 }
