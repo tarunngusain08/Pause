@@ -40,7 +40,7 @@ class StrictBlockOverlayView(
         goBackButton = findViewById(R.id.strict_block_go_back)
         emergencyButton = findViewById(R.id.strict_block_emergency_button)
 
-        setBackgroundColor(0xFFF0F4F8.toInt())
+        setBackgroundColor(0xFF1A1A2E.toInt())
         appNameLabel.text = "$appName is blocked"
         updateRemaining(remainingMs)
 
