@@ -16,11 +16,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.pause.app.ui.contentshield.ContentShieldScreen
 import com.pause.app.ui.home.HomeScreen
 import com.pause.app.ui.onboarding.OnboardingScreen
 import com.pause.app.ui.onboarding.OnboardingViewModel
 import com.pause.app.ui.strict.StrictModeSetupScreen
-import com.pause.app.ui.contentshield.ContentShieldScreen
 import com.pause.app.ui.webfilter.UnblockRequestScreen
 
 @Composable
@@ -59,7 +59,12 @@ fun PauseNavGraph() {
         composable(Routes.HOME) {
             HomeScreen(
                 onNavigateToStrictSetup = { navController.navigate(Routes.FOCUS_SETUP) },
-                onNavigateToContentShield = { navController.navigate(Routes.CONTENT_SHIELD) }
+                onNavigateToSocialFilter = { navController.navigate(Routes.SOCIAL_FILTER) }
+            )
+        }
+        composable(Routes.SOCIAL_FILTER) {
+            ContentShieldScreen(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(Routes.FOCUS_SETUP) {
@@ -69,11 +74,6 @@ fun PauseNavGraph() {
                         popUpTo(Routes.FOCUS_SETUP) { inclusive = true }
                     }
                 },
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable(Routes.CONTENT_SHIELD) {
-            ContentShieldScreen(
                 onBack = { navController.popBackStack() }
             )
         }
