@@ -12,7 +12,7 @@ This document describes how Focus uses the Android Accessibility Service for for
   - Optionally read **URL bar text** in supported browsers when Web Filter URL capture is enabled (`TYPE_WINDOW_CONTENT_CHANGED`).
 - **What it does not do:** Read generic screen content, passwords, or messages. URL reading is limited to the address bar for classification and visit log only; enforcement is done by the VPN.
 
-The service cannot use Hilt constructor injection (it is created by the system). It uses **PauseAccessibilityEntryPoint** to obtain dependencies from the application context when `onServiceConnected()` runs. Interception logic is delegated to **InterceptionPipeline**, which evaluates stages in order: Strict → Commitment → Parental → Standard (monitored apps).
+The service cannot use Hilt constructor injection (it is created by the system). It uses **PauseAccessibilityEntryPoint** to obtain dependencies from the application context when `onServiceConnected()` runs. Interception logic is delegated to **InterceptionPipeline**, which evaluates stages in order: Strict → Content Shield.
 
 ---
 
@@ -26,14 +26,12 @@ Handled in `handleWindowStateChanged(event)`:
    - If `event.packageName` equals the last known foreground package, the event is ignored.
 
 2. **Excluded and launcher packages**  
-   - System UI, launchers, Settings, package installer, and the Focus app itself are excluded. For these, `overlayManager.dismiss()` is called and the handler returns.
+   - System UI, launchers, package installer, and the Focus app itself are excluded. (Settings is evaluated and blocked during Focus Mode.) For these, `overlayManager.dismiss()` is called and the handler returns.
 
 3. **InterceptionPipeline.evaluate(pkg)**  
-   - The pipeline runs four stages in order; the first that handles the package returns true and stops:
+   - The pipeline runs two stages in order; the first that handles the package returns true and stops:
      - **Strict** — If a Strict session is active and the app is blocked, `StrictBlockOverlayView` is shown (with optional emergency exit). If the app is allowed, any block overlay is dismissed.
-     - **Commitment** — If an active commitment session blocks this package, `CommitmentBlockOverlayView` is shown. “Break commitment” leads to the 90s cooldown, then session break + streak reset.
-     - **Parental** — If the app is blocked, the parental block overlay is shown (with optional emergency contact). If the app only requires friction, the delay overlay is shown.
-     - **Standard** — If the package is in the monitored apps list: allowance exhausted → `AllowanceReachedOverlayView`; launch limit reached → `LaunchLimitOverlayView`; otherwise → reflection (when friction is MEDIUM/HIGH or a focus session is active) then delay overlay, or delay only.
+     - **Content Shield** — If the app or URL is blocked by Content Shield (adult filter, social media filter, domain blacklist, keyword match), `ContentShieldBlockOverlayView` is shown.
    - If no stage handles the package, `overlayManager.dismiss()` is called.
 
 **Unlock detection (lock screen intervention)** — Uses `ACTION_USER_PRESENT` broadcast via `userPresentReceiver` (registered in `onServiceConnected`). When the user unlocks the device, the app records the unlock. If ≥5 unlocks occurred in the last 15 minutes, it shows the lock intervention overlay.
@@ -68,22 +66,16 @@ Details of URL classification and VPN enforcement are in [webfilter.md](webfilte
 | State | Priority | View / Behavior |
 |-------|----------|------------------|
 | `IDLE` | 0 | No overlay |
-| `SHOWING_GENTLE_REENTRY` | 5 | GentleReentryOverlayView — brief “Focus. Breathe.” on unlock when count &lt; 5 |
 | `SHOWING_SCHEDULE_RESUME` | 10 | Schedule band change notification |
 | `SHOWING_SESSION_RESUME` | 10 | Session resume notification |
 | `SHOWING_SESSION_COMPLETE` | 10 | Session complete notification |
 | `SHOWING_LOCK_INTERVENTION` | 20 | LockInterventionOverlayView — “You’ve unlocked X times…” |
-| `SHOWING_REFLECTION` | 30 | ReflectionOverlayView — “Why are you opening &lt;app&gt;?” with reason buttons |
-| `SHOWING_DELAY` | 40 | DelayOverlayView — countdown, Cancel / wait |
-| `SHOWING_ALLOWANCE_REACHED` | 60 | AllowanceReachedOverlayView — daily allowance used; “Open anyway” / “I’m done” |
-| `SHOWING_LAUNCH_LIMIT` | 65 | LaunchLimitOverlayView — per-app limit reached; “Open anyway” / skip |
-| `SHOWING_COOLDOWN` | 70 | CooldownOverlayView — 90s cooldown for commitment break |
-| `SHOWING_COMMITMENT_BLOCK` | 85 | CommitmentBlockOverlayView — “Break commitment” → cooldown |
 | `SHOWING_PARENTAL_BLOCK` | 90 | ParentalBlockOverlayView — app blocked by parent; optional emergency contact |
 | `SHOWING_POWER_BLOCK` | 90 | PowerMenuBlockOverlayView — power menu blocked during strict/parental |
 | `SHOWING_PIN_ENTRY` | 95 | PINEntryOverlayView — parent PIN to access dashboard |
 | `SHOWING_EMERGENCY_CONFIRM` | 95 | EmergencyConfirmOverlayView — confirm emergency exit |
-| `SHOWING_STRICT_BLOCK` | 100 | StrictBlockOverlayView — app blocked for strict session; optional emergency exit |
+| `SHOWING_CONTENT_SHIELD_BLOCK` | 100 | ContentShieldBlockOverlayView — app/URL blocked by Content Shield |
+| `SHOWING_STRICT_BLOCK` | 100 | StrictBlockOverlayView — app blocked for Focus Mode session; optional emergency exit |
 
 ---
 
