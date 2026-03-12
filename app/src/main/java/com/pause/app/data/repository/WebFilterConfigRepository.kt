@@ -1,8 +1,8 @@
 package com.pause.app.data.repository
 
+import android.util.Log
 import com.pause.app.data.db.dao.WebFilterConfigDao
 import com.pause.app.data.db.entity.WebFilterConfig
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,15 +14,16 @@ class WebFilterConfigRepository @Inject constructor(
     suspend fun getConfig(): WebFilterConfig? =
         webFilterConfigDao.getConfig()
 
-    fun getConfigFlow(): Flow<WebFilterConfig?> =
-        webFilterConfigDao.getConfigFlow()
-
     suspend fun saveConfig(config: WebFilterConfig) {
         webFilterConfigDao.insertOrReplace(config)
     }
 
     suspend fun setVpnEnabled(enabled: Boolean) {
         webFilterConfigDao.ensureAndSetVpnEnabled(enabled)
+        val verified = webFilterConfigDao.getConfig()?.vpnEnabled
+        if (verified != enabled) {
+            Log.w(TAG, "VPN config verification failed: expected vpnEnabled=$enabled, got $verified")
+        }
     }
 
     suspend fun setUrlReaderEnabled(enabled: Boolean) {
@@ -31,5 +32,9 @@ class WebFilterConfigRepository @Inject constructor(
 
     suspend fun setKeywordFilterEnabled(enabled: Boolean) {
         webFilterConfigDao.ensureAndSetKeywordFilterEnabled(enabled)
+    }
+
+    companion object {
+        private const val TAG = "WebFilterConfigRepo"
     }
 }
